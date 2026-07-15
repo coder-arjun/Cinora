@@ -1,0 +1,46 @@
+@{
+    ViewData["Title"] = "Welcome";
+}
+
+<section class="relative isolate overflow-hidden">
+    @* Cinematic backdrop — a soft gold glow over a scrim into the page background. No image asset
+       needed yet; the gradient reads as a lit backdrop. All colours are design tokens. *@
+    <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div class="absolute -top-24 left-1/2 h-96 w-full max-w-3xl -translate-x-1/2 rounded-full bg-accent/10 blur-3xl"></div>
+        <div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-surface-0"></div>
+    </div>
+
+    <div class="animate-rise-in mx-auto flex max-w-6xl flex-col items-center px-4 py-24 text-center sm:px-6 sm:py-32 lg:py-40">
+        <p class="mb-6 inline-flex items-center gap-2 rounded-pill border border-white/10 bg-surface-1/60 px-4 py-1.5 text-xs font-medium uppercase tracking-widest text-ink-subtle backdrop-blur-glass">
+            Social film reviews
+        </p>
+
+        <h1 class="font-display text-display font-semibold text-ink">
+            Discover your next <span class="text-accent">obsession.</span>
+        </h1>
+
+        <p class="mt-6 max-w-2xl text-lg text-ink-muted">
+            A premium home for movie &amp; series reviews — rated by people who actually love film.
+            Follow friends, share your take, and always know what to watch next.
+        </p>
+
+        <div class="mt-10 flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row">
+            <a asp-controller="Account" asp-action="Register" class="btn btn-primary w-full sm:w-auto">
+                Get started
+            </a>
+            @* A guided, fullscreen walkthrough of what Cinora offers (/tour is [AllowAnonymous]). *@
+            <a asp-controller="Tour" asp-action="Index" class="btn btn-ghost w-full sm:w-auto">
+                Explore Cinora
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
+                    <path d="M4 10h11M11 5l5 5-5 5" />
+                </svg>
+            </a>
+        </div>
+
+        <p class="mt-6 text-sm text-ink-subtle">
+            Already have an account?
+            <a asp-controller="Account" asp-action="Login" class="link">Sign in</a>
+        </p>
+    </div>
+</section>

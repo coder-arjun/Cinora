@@ -1,0 +1,98 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Cinora.Infrastructure — depends on Cinora.Application (Domain arrives transitively), §3. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Cinora.Application\Cinora.Application.csproj" />
+  </ItemGroup>
+
+  <!--
+    Persistence + Identity stores (Milestone 1.2, solution-structure.md §4). The SqlServer provider
+    brings in the EF Core abstractions transitively; Design supplies design-time services for
+    `dotnet ef`; the Identity EF package provides the stores for ApplicationUser.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+    <!-- DB-persisted Data-Protection keys: CinoraDbContext implements IDataProtectionKeyContext so the key ring
+         survives restarts/redeploys (Program.cs wires PersistKeysToDbContext). Transitive to Cinora.Web. -->
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" />
+  </ItemGroup>
+
+  <!--
+    Phase 3 (ADR 0009): the CurrentUser adapter resolves the acting user from the request's ClaimsPrincipal
+    via IHttpContextAccessor. That type lives in the ASP.NET Core shared framework, so this outer adapter
+    layer references it (the framework way, warning-free under TreatWarningsAsErrors). The dependency rule is
+    unaffected — Infrastructure still references only Application; this is a framework, not a project, edge.
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <!--
+    Milestone 2.0 — free, first-party resilience for the typed TMDB HttpClient (AddStandardResilienceHandler).
+    Version pinned centrally in ../../Directory.Packages.props.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+  </ItemGroup>
+
+  <!--
+    Milestone 5.0 — the free, local AI recommendation engine (ADR 0016). Microsoft.Extensions.AI's IChatClient
+    is the provider-agnostic seam; Microsoft.Extensions.AI.OpenAI + OpenAI speak the OpenAI-compatible protocol
+    that Ollama exposes at http://localhost:11434/v1 (the free default — never the paid api.openai.com). Versions
+    are pinned centrally. Only THIS project references them: the vendor types (IChatClient/ChatMessage/OpenAIClient)
+    live inside the OllamaRecommendationEngine adapter and never cross into Application/Domain, so the
+    IRecommendationEngine port stays provider-agnostic (a Gemini/Groq swap is registration-only).
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="OpenAI" />
+  </ItemGroup>
+
+  <!--
+    Milestone 5.3 — the Hangfire OSS precompute job (ADR 0018, redeeming ADR 0007). Hangfire.Core (LGPLv3, free
+    OSS — CLAUDE.md's approved substitution, NOT Hangfire Pro) supplies the [DisableConcurrentExecution] /
+    [AutomaticRetry] attributes on RecommendationPrecomputeJob; the Hangfire CLIENT/SERVER/dashboard live at the
+    Web composition root. Newtonsoft.Json 13.0.3 (MIT) is a DIRECT override that supersedes the vulnerable
+    Newtonsoft.Json 11.0.1 that Hangfire.Core pulls transitively (NU1903 — a known HIGH-severity advisory that
+    would otherwise fail the 0-warning build). Versions are pinned centrally.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Hangfire.Core" />
+    <PackageReference Include="Newtonsoft.Json" />
+  </ItemGroup>
+
+  <!--
+    Milestone 6.2 — the free, MIT WebPush library (ADR 0020). Infrastructure-only: the WebPushSender adapter maps
+    the Application-owned push primitives to the lib's PushSubscription/VapidDetails, so the vendor type never
+    crosses the dependency rule into Application/Domain. Version pinned centrally.
+  -->
+  <ItemGroup>
+    <PackageReference Include="WebPush" />
+  </ItemGroup>
+
+  <!--
+    Forgot/Reset-password email over SMTP (MailKit + MimeKit). Infrastructure-only: the SmtpEmailSender adapter
+    sits behind the Application IEmailSender port, so MimeMessage/SmtpClient never cross the dependency rule.
+  -->
+  <ItemGroup>
+    <PackageReference Include="MailKit" />
+    <PackageReference Include="MimeKit" />
+  </ItemGroup>
+
+  <!--
+    The TMDB DTOs, mapper, TmdbClient, and TmdbImageUrlBuilder are internal (ADR 0006): only the Application
+    ports are public. The Infrastructure unit tests exercise the concrete adapters through a fake
+    HttpMessageHandler, so they need internal visibility. Milestone 5.3 additionally exposes internals to the
+    Web composition root (so Program.cs can name the internal RecommendationPrecomputeJob in RecurringJob.
+    AddOrUpdate) and to the Web integration tests (which resolve the job from DI to drive RunAsync directly).
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Cinora.Infrastructure.Tests" />
+    <InternalsVisibleTo Include="Cinora.Web" />
+    <InternalsVisibleTo Include="Cinora.Web.IntegrationTests" />
+  </ItemGroup>
+
+</Project>

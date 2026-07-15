@@ -1,0 +1,7 @@
+# Playwright / Node artifacts for the isolated e2e project. Nothing here is checked in except the specs,
+# config, package.json/lock, and README.
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

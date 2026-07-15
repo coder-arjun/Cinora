@@ -1,0 +1,175 @@
+@model WatchlistControlVm
+@{
+    var mediaSegment = Model.Media.ToString().ToLowerInvariant();
+    var detailsPath = $"/discover/title/{mediaSegment}/{Model.TmdbId}";
+    // A STABLE id per (surface-agnostic) title so HTMX swaps the control in place (outerHTML) and site.ts can
+    // restore focus after the swap. Media is part of the id so a movie and a series with the same TMDB id do
+    // not collide on a mixed surface.
+    var controlId = $"watchlist-control-{mediaSegment}-{Model.TmdbId}";
+    var onDetails = Model.OnDetails ? "true" : "false";
+
+    var inList = Model.Status is not null;
+    var statusLabel = Model.Status switch
+    {
+        WatchlistStatus.PlanToWatch => "Plan to Watch",
+        WatchlistStatus.Watching => "Watching",
+        WatchlistStatus.Watched => "Watched",
+        _ => "Add to watchlist",
+    };
+
+    // The trigger's accessible name. On a card the visible label is hidden (icon-only over the poster), so this
+    // carries the whole meaning; on Details the same name reinforces the visible label. "Add to watchlist" (the
+    // not-in-list name) is the string WatchlistTests W2 asserts survives a remove.
+    var triggerLabel = inList
+        ? $"Watchlist status: {statusLabel}. Change or remove."
+        : "Add to watchlist";
+
+    // The concise phrase site.ts copies into the shared polite #watchlist-status region AFTER a set/remove
+    // swap (never read on first render). Derived from the resulting status so the mapping lives once here.
+    var announce = Model.Status switch
+    {
+        WatchlistStatus.PlanToWatch => "Plan to Watch — added to watchlist",
+        WatchlistStatus.Watching => "Marked as Watching",
+        WatchlistStatus.Watched => "Marked as Watched",
+        _ => "Removed from watchlist",
+    };
+
+    // DELETE carries its params in the query string (the anti-forgery token rides the RequestVerificationToken
+    // header site.ts attaches — no form body needed); the controller binds tmdbId/media/onDetails from there.
+    var removeUrl = $"/watchlist?tmdbId={Model.TmdbId}&media={Model.Media}&onDetails={onDetails}";
+}
+
+@*
+    Milestone 4.3 — the reusable watchlist status control (§5.3, ADR 0014). Rendered on Details, the discovery
+    rails and search cards; it swaps ITSELF (hx-target="#{id}", outerHTML) with the partial the set/remove
+    endpoints return. Authed → a status menu whose options POST/DELETE to WatchlistController carrying the
+    title's TMDB coordinates (the server resolves the internal MovieId via EnsureTitleCachedCommand — ADR 0008);
+    anonymous → a sign-in affordance. No user id is bound (ADR 0009).
+
+    PROGRESSIVE ENHANCEMENT: the baseline is a native <details>/<summary> disclosure + a real <form> with the
+    hidden anti-forgery field, working WITHOUT JS. The @@alpinejs/csp name-only `watchlistMenu` component
+    (Scripts/components/watchlistMenu.ts) ELEVATES it to a keyboard-complete menu button and — the load-bearing
+    part — PORTALS the open panel to document.body and pins it position:fixed, so no ancestor containing block
+    (a rail's overflow-x:auto scroller, or the Details title panel's backdrop-filter/transform) can clip or
+    mis-position it; it is un-portaled back into the control before every HTMX swap so it is never orphaned. All
+    Alpine values are BARE names (x-on:click="onTriggerClick", x-bind:aria-expanded="open"…) so the strict
+    script-src 'self' CSP is untouched (no eval, no hx-on). Anti-forgery: the POST form injects the hidden token
+    (no-JS) and HTMX also sends it via the header; DELETE relies on the header. NO CSP widening.
+*@
+@* data-wl-status mirrors the resulting WatchlistStatus (null → attribute omitted). The /watchlist page block in
+   Scripts/site.ts reads it off the swapped-in control after a set POST to re-sync the card's status attribute and
+   the filter-chip counts — a machine-readable source that never depends on the visible label. Inert everywhere
+   else. *@
+<div id="@controlId" data-watchlist-control data-wl-announce="@(Model.IsAuthenticated ? announce : null)"
+     data-wl-status="@Model.Status" class="wl-control">
+    @if (!Model.IsAuthenticated)
+    {
+        @* Anonymous → a bookmark affordance that routes to sign-in and returns to this title (§5.3, §9). On a
+           card it is icon-only (the aria-label carries the name); Details shows the label too. *@
+        <a asp-controller="Account" asp-action="Login" asp-route-ReturnUrl="@detailsPath"
+           class="wl-trigger" aria-label="Sign in to save this title to your watchlist">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" class="wl-bookmark h-4 w-4" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
+            </svg>
+            @if (Model.OnDetails)
+            {
+                <span>Sign in to save</span>
+            }
+        </a>
+    }
+    else
+    {
+        <details x-data="watchlistMenu" class="wl-details">
+            @* The disclosure trigger. Native <summary> is keyboard-operable and toggles the menu WITHOUT JS;
+               the component intercepts the click to also lift the panel out of the rail overflow. aria-expanded
+               is bound by Alpine only (absent for no-JS, where native <details> semantics apply). *@
+            <summary data-wl-trigger x-ref="trigger"
+                     x-on:click="onTriggerClick" x-on:keydown="onTriggerKeydown"
+                     x-bind:aria-expanded="open"
+                     aria-haspopup="menu" aria-label="@triggerLabel"
+                     class="wl-trigger @(inList ? "is-active" : null)">
+                <svg viewBox="0 0 20 20" fill="@(inList ? "currentColor" : "none")" stroke="currentColor" stroke-width="1.5" class="wl-bookmark h-4 w-4" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
+                </svg>
+                @if (Model.OnDetails)
+                {
+                    <span>@statusLabel</span>
+                }
+                <svg viewBox="0 0 20 20" fill="currentColor" class="wl-chevron h-3.5 w-3.5" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                </svg>
+            </summary>
+
+            <div role="menu" aria-label="Set watchlist status" x-ref="panel"
+                 x-on:keydown="onPanelKeydown" class="wl-menu-panel">
+                @* One form, three status submit buttons (the clicked submitter's Status value is sent). The form
+                   tag helper injects the anti-forgery hidden field for the no-JS path; hx-post reuses the fields. *@
+                <form asp-controller="Watchlist" asp-action="Set" method="post"
+                      hx-post="/watchlist" hx-target="#@controlId" hx-swap="outerHTML">
+                    <input type="hidden" name="TmdbId" value="@Model.TmdbId" />
+                    <input type="hidden" name="Media" value="@Model.Media" />
+                    <input type="hidden" name="OnDetails" value="@onDetails" />
+
+                    @foreach (var (value, label) in new[]
+                    {
+                        (WatchlistStatus.PlanToWatch, "Plan to Watch"),
+                        (WatchlistStatus.Watching, "Watching"),
+                        (WatchlistStatus.Watched, "Watched"),
+                    })
+                    {
+                        var isCurrent = Model.Status == value;
+                        @* Mutually-exclusive status options → role="menuitemradio" + aria-checked (the idiomatic
+                           single-select menu pattern); the selected one carries aria-checked="true". *@
+                        <button type="submit" name="Status" value="@value" role="menuitemradio"
+                                aria-checked="@(isCurrent ? "true" : "false")"
+                                class="wl-menu-item @(isCurrent ? "is-current" : null)">
+                            <span class="wl-menu-check" aria-hidden="true">@(isCurrent ? "✓" : string.Empty)</span>
+                            <span>@label</span>
+                        </button>
+                    }
+
+                    @if (inList)
+                    {
+                        @* Remove is JS-only: hx-delete has no no-JS fallback (the three status options DO submit
+                           without JS via the form). `js-only` keeps it out of the no-JS DOM (hidden until site.ts
+                           stamps `js` on <html>) so it never ships as a dead control (review-gate M2). *@
+                        <div class="wl-menu-sep js-only" role="separator"></div>
+                        <button type="button" role="menuitem"
+                                hx-delete="@removeUrl" hx-target="#@controlId" hx-swap="outerHTML"
+                                class="wl-menu-item is-danger js-only">
+                            <span class="wl-menu-check" aria-hidden="true"></span>
+                            <span>Remove from watchlist</span>
+                        </button>
+                    }
+                </form>
+            </div>
+        </details>
+
+        @if (Model.Status == WatchlistStatus.Watched)
+        {
+            @* Watched → review nudge (§5.4), revealed with a tasteful entrance (collapsed under
+               prefers-reduced-motion by the global rule). On Details it links the in-page lazy #my-review write
+               region; on a card it is a compact chip (dark scrim → AA over any poster) linking the title's
+               Details reviews section. *@
+            if (Model.OnDetails)
+            {
+                <a href="#my-review" data-watchlist-review-nudge class="wl-nudge">
+                    <svg viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
+                        <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 .5l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+                    </svg>
+                    Write your review
+                </a>
+            }
+            else
+            {
+                <a href="@(detailsPath)#cinora-reviews-heading" class="wl-nudge-chip"
+                   aria-label="Write your review of this title">
+                    <svg viewBox="0 0 20 20" fill="currentColor" class="wl-star h-3 w-3" aria-hidden="true">
+                        <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 .5l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+                    </svg>
+                    Review?
+                </a>
+            }
+        }
+    }
+</div>

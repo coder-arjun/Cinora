@@ -1,0 +1,39 @@
+@model RailViewModel
+
+@*
+    Milestone 2.3 / 4.3 — one rail's cards (partial, NO layout). The heading stays in the shell (Index.cshtml);
+    this partial REPLACES the shell's lazy container (hx-swap="outerHTML"), so its root carries
+    aria-busy="false" to clear the container's loading state — otherwise the swapped-away aria-busy="true"
+    would linger unreset (WCAG 4.1.2). Empty Items → a quiet empty state, never an error. Styling:
+    mobile-first snap-scroll row (.rail / .rail-scroller in app.css) with a hidden scrollbar and faint edge
+    fades; each item is a premium 2:3 poster card (_TitleCard).
+
+    4.3: the batch status map (Model.Statuses, resolved once per rail for authed users — ADR 0014) drives a
+    _WatchlistControl per card. The control is an absolutely-positioned SIBLING over the poster, OUTSIDE the
+    card's <a> (an interactive control cannot nest in an anchor). The frontend-agent elevates the placement /
+    menu UI; here it is wired correctly and works.
+*@
+@if (Model.Rail.Items.Count == 0)
+{
+    <p class="px-1 py-8 text-sm text-ink-subtle" aria-busy="false">No titles to show right now.</p>
+}
+else
+{
+    <div class="rail" aria-busy="false">
+        <ul role="list" class="rail-scroller">
+            @foreach (var card in Model.Rail.Items)
+            {
+                var status = Model.Statuses.TryGetValue(card.TmdbId, out var s) ? s : (WatchlistStatus?)null;
+                var control = new WatchlistControlVm(card.TmdbId, card.MediaType, status, Model.IsAuthenticated);
+                <li class="rail-item w-32 sm:w-40 lg:w-44">
+                    <div class="relative">
+                        <partial name="_TitleCard" model="card" />
+                        <div class="absolute left-2 top-2 z-10">
+                            <partial name="_WatchlistControl" model="control" />
+                        </div>
+                    </div>
+                </li>
+            }
+        </ul>
+    </div>
+}

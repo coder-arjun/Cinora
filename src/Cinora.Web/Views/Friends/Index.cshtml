@@ -1,0 +1,121 @@
+@using Cinora.Application.Features.Blocks
+@model FriendsPageVm
+@{
+    ViewData["Title"] = "Friends";
+    var incoming = Model.Requests.Incoming;
+    var outgoing = Model.Requests.Outgoing;
+    var friends = Model.Friends.Friends;
+    var blocked = Model.Blocked.Blocked;
+}
+
+@*
+    The social hub (§6). Sections, top-to-bottom, by intent: Find people (exact-match search + WhatsApp invite —
+    the primary "grow your circle" action), incoming Requests (Accept/Decline), Sent (outgoing, now with Cancel),
+    Your friends (Remove), and Blocked (Unblock). Every action is attribute-driven HTMX (no inline JS) so the
+    strict CSP is untouched; all display names are Razor output-encoded via the partials.
+*@
+<section class="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+    <div class="animate-rise-in">
+        <p class="text-xs font-semibold uppercase tracking-widest text-accent">Your circle</p>
+        <h1 class="mt-2 font-display text-4xl text-ink">Friends</h1>
+    </div>
+
+    @* Find people — exact-match search (username OR email) + the WhatsApp invite for people not yet on Cinora.
+       The search box is attribute-driven HTMX: debounced typing (and the native clear/enter "search" event) GET
+       /friends/search, swapping the result into the aria-live region below. Exact-match only (§4) — a no-match
+       and a blocked user render the SAME calm empty state (§14). *@
+    <div class="mt-8">
+        <h2 class="font-display text-xl text-ink">Find people</h2>
+        <p class="mt-1 text-sm text-ink-subtle">Search by exact username or email to send a friend request.</p>
+        <div class="mt-4">
+            <label for="user-search" class="sr-only">Search for people by username or email</label>
+            <input id="user-search" type="search" name="term" autocomplete="off" spellcheck="false"
+                   placeholder="Exact username or email"
+                   class="w-full rounded-btn border border-white/10 bg-surface-2/60 px-4 py-2.5 text-sm text-ink placeholder:text-ink-subtle transition-colors focus:border-accent/40 focus:outline-none"
+                   hx-get="@Url.Action("Search", "Friends")"
+                   hx-trigger="input changed delay:400ms, search"
+                   hx-target="#user-search-result"
+                   hx-swap="innerHTML" />
+            <div id="user-search-result" aria-live="polite" class="mt-3"></div>
+        </div>
+
+        @* Invite friends to Cinora via WhatsApp (professional pre-filled message → this deployment's URL). *@
+        <partial name="_InviteFriends" />
+    </div>
+
+    @* One persistent polite node: site.ts copies a concise result here after each HTMX friend action
+       ("You are now friends", "Request declined", "Friend removed", "Request sent", "Request cancelled"). A
+       freshly-inserted role="status" is often not announced, so this is the reliable SR path (F3). *@
+    <span id="friends-status" class="sr-only" role="status" aria-live="polite"></span>
+
+    @* Incoming requests — the highest-priority action area. The list + empty-state are a CSS-driven
+       .friend-collection (app.css): responding to the LAST request restores "No pending requests" with no
+       re-render (F4). site.ts toggles .is-empty off the real [data-pending-request] markers; the server
+       seeds it here for the no-JS baseline. *@
+    <div class="mt-10">
+        <h2 class="font-display text-xl text-ink">Requests</h2>
+        <div class="friend-collection mt-4 @(incoming.Count == 0 ? "is-empty" : null)">
+            <div class="collection-items space-y-3">
+                @foreach (var request in incoming)
+                {
+                    <partial name="_PendingRequest" model="request" />
+                }
+            </div>
+            <p class="collection-empty text-sm text-ink-subtle">No pending requests right now.</p>
+        </div>
+    </div>
+
+    @* Outgoing requests — awaiting a response; each can be cancelled. *@
+    @if (outgoing.Count > 0)
+    {
+        <div class="mt-10">
+            <h2 class="font-display text-xl text-ink">Sent</h2>
+            <div class="mt-4 space-y-3">
+                @foreach (var request in outgoing)
+                {
+                    <partial name="_PendingRequest" model="request" />
+                }
+            </div>
+        </div>
+    }
+
+    @* Accepted friends. The hard "(N)" count was dropped (it went stale after a Remove, F4). List +
+       empty-state are a CSS-driven .friend-collection: removing your last friend restores the empty card
+       for free (site.ts toggles .is-empty off the real [data-friend-card] markers; server seeds it for no-JS). *@
+    <div class="mt-10">
+        <h2 class="font-display text-xl text-ink">Your friends</h2>
+        <div class="friend-collection mt-4 @(friends.Count == 0 ? "is-empty" : null)">
+            <div class="collection-items space-y-3">
+                @foreach (var friend in friends)
+                {
+                    <partial name="_FriendCard" model="friend" />
+                }
+            </div>
+            <div class="collection-empty card-glass px-6 py-8 text-center">
+                <p class="text-sm text-ink-muted">
+                    You have no friends yet. Find people by their exact username or email using
+                    <a class="link" href="#user-search">the search above</a>.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    @* Blocked — full cut-off + hide (§2); each row can be unblocked. A blocked user never notifies and never
+       reappears in search/feed while blocked. *@
+    <div class="mt-10">
+        <h2 class="font-display text-xl text-ink">Blocked</h2>
+        @if (blocked.Count == 0)
+        {
+            <p class="mt-4 text-sm text-ink-subtle">You haven't blocked anyone.</p>
+        }
+        else
+        {
+            <div class="mt-4 space-y-3">
+                @foreach (var user in blocked)
+                {
+                    <partial name="_BlockedUserCard" model="user" />
+                }
+            </div>
+        }
+    </div>
+</section>

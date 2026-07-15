@@ -1,0 +1,30 @@
+@*
+    The Cinora brand lockup — a gold "C" mark cradling a play triangle (film + monogram) beside the Fraunces
+    wordmark. Inline SVG so it stays crisp at any size with no image request; the tab favicon
+    (wwwroot/favicon.svg) and the PWA icons (Scripts/generate-icons.mjs) render the same mark. Decorative: the
+    wrapping <a> in the layout carries the accessible name, so the SVG is aria-hidden.
+*@
+<span class="inline-flex items-center gap-2.5">
+    <svg viewBox="0 0 32 32" class="h-7 w-7 shrink-0" aria-hidden="true" focusable="false">
+        <defs>
+            <linearGradient id="logoGold" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#f4d488" />
+                <stop offset="1" stop-color="#d9a02c" />
+            </linearGradient>
+            <linearGradient id="logoTile" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#171a22" />
+                <stop offset="1" stop-color="#0a0c11" />
+            </linearGradient>
+            <radialGradient id="logoGlow" cx="0.5" cy="0.46" r="0.55">
+                <stop offset="0" stop-color="#ebbd57" stop-opacity="0.30" />
+                <stop offset="0.7" stop-color="#ebbd57" stop-opacity="0.05" />
+                <stop offset="1" stop-color="#ebbd57" stop-opacity="0" />
+            </radialGradient>
+        </defs>
+        <rect x="1.25" y="1.25" width="29.5" height="29.5" rx="8" fill="url(#logoTile)" stroke="#ebbd57" stroke-opacity="0.22" />
+        <circle cx="16" cy="15.4" r="10.5" fill="url(#logoGlow)" />
+        <path d="M22.78 20.24 A8 8 0 1 1 22.78 11.76" fill="none" stroke="url(#logoGold)" stroke-width="3.3" stroke-linecap="round" />
+        <path d="M13.5 12.5 L19 16 L13.5 19.5 Z" fill="url(#logoGold)" />
+    </svg>
+    <span class="font-display text-xl font-semibold tracking-tight text-ink">Cinora</span>
+</span>

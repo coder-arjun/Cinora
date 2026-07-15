@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -f /c/Users/ADMINI~1/AppData/Local/Temp/claude/D--Cinora/94a0e519-4c8a-43ff-8ff5-d8464d918595/scratchpad/web-run.log)",
+      "Bash(ASPNETCORE_URLS=http://127.0.0.1:5199 ASPNETCORE_ENVIRONMENT=Production dotnet D:/Cinora/src/Cinora.Web/bin/Release/net10.0/Cinora.Web.dll)"
+    ]
+  }
+}

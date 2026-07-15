@@ -1,0 +1,66 @@
+@model RegisterViewModel
+@{
+    ViewData["Title"] = "Create your account";
+    ViewData["MinimalNav"] = true;
+}
+
+<section class="mx-auto flex w-full max-w-md flex-col px-4 py-16 sm:py-24">
+    <div class="card-glass animate-rise-in p-6 sm:p-8">
+        <h1 class="font-display text-3xl text-ink">Create your account</h1>
+        <p class="mt-2 text-sm text-ink-muted">Join Cinora and start rating what you watch.</p>
+
+        <form asp-controller="Account" asp-action="Register" method="post" class="mt-8 space-y-5">
+            <div asp-validation-summary="ModelOnly" role="alert"></div>
+            <input type="hidden" asp-for="ReturnUrl" />
+
+            <div>
+                <label asp-for="DisplayName" class="label"></label>
+                <input asp-for="DisplayName" autocomplete="nickname" class="input"
+                       placeholder="Ada Lovelace"
+                       aria-describedby="DisplayName-error"
+                       aria-invalid="@(ViewData.ModelState[nameof(Model.DisplayName)]?.Errors.Count > 0 ? "true" : "false")" />
+                <span asp-validation-for="DisplayName" id="DisplayName-error"></span>
+            </div>
+
+            <div>
+                <label asp-for="Email" class="label"></label>
+                <input asp-for="Email" type="email" autocomplete="username" class="input"
+                       placeholder="you@example.com"
+                       aria-describedby="Email-error"
+                       aria-invalid="@(ViewData.ModelState[nameof(Model.Email)]?.Errors.Count > 0 ? "true" : "false")" />
+                <span asp-validation-for="Email" id="Email-error"></span>
+            </div>
+
+            <div>
+                <label asp-for="Password" class="label"></label>
+                <div class="relative" x-data="passwordToggle">
+                    <input asp-for="Password" autocomplete="new-password" class="input pr-11"
+                           x-bind:type="inputType"
+                           aria-describedby="Password-hint Password-error"
+                           aria-invalid="@(ViewData.ModelState[nameof(Model.Password)]?.Errors.Count > 0 ? "true" : "false")" />
+                    <partial name="_PasswordEyeButton" />
+                </div>
+                <p id="Password-hint" class="mt-1 text-xs text-ink-subtle">Use at least 8 characters.</p>
+                <span asp-validation-for="Password" id="Password-error"></span>
+            </div>
+
+            <div>
+                <label asp-for="ConfirmPassword" class="label"></label>
+                <div class="relative" x-data="passwordToggle">
+                    <input asp-for="ConfirmPassword" autocomplete="new-password" class="input pr-11"
+                           x-bind:type="inputType"
+                           aria-describedby="ConfirmPassword-error"
+                           aria-invalid="@(ViewData.ModelState[nameof(Model.ConfirmPassword)]?.Errors.Count > 0 ? "true" : "false")" />
+                    <partial name="_PasswordEyeButton" />
+                </div>
+                <span asp-validation-for="ConfirmPassword" id="ConfirmPassword-error"></span>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-full">Create account</button>
+        </form>
+    </div>
+
+    <p class="mt-6 text-center text-sm text-ink-muted">
+        Already have an account? <a asp-controller="Account" asp-action="Login" class="link">Sign in</a>
+    </p>
+</section>

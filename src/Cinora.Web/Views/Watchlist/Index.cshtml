@@ -1,0 +1,174 @@
+@model WatchlistPageViewModel
+@{
+    ViewData["Title"] = "Watchlist";
+
+    var page = Model.Page;
+    var counts = Model.Counts;
+    var active = Model.ActiveFilter;
+    var sort = Model.Sort;
+
+    // The load-more sentinel URL: the next keyset page for the SAME filter + sort, addressed only by the opaque
+    // (cursorKey, cursorId) cursor of page 1's last item — never a page number/OFFSET.
+    string? nextUrl = null;
+    if (page.HasMore && page.NextCursor is { } cursor)
+    {
+        nextUrl = Url.Action("Page", "Watchlist", new
+        {
+            status = active?.ToString(),
+            sort = sort.ToString(),
+            cursorKey = cursor.SortKey.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+            cursorId = cursor.Id,
+        });
+    }
+
+    // The filter chips (§6.3): "All" plus one per status, each carrying its count from GetWatchlistCountsQuery.
+    var chips = new (string Label, WatchlistStatus? Status)[]
+    {
+        ("All", null),
+        ("Plan to Watch", WatchlistStatus.PlanToWatch),
+        ("Watching", WatchlistStatus.Watching),
+        ("Watched", WatchlistStatus.Watched),
+    };
+
+    static string SortLabel(WatchlistSort value) => value switch
+    {
+        WatchlistSort.RecentlyAdded => "Recently added",
+        _ => value.ToString(),
+    };
+}
+
+@*
+    Milestone 4.4 — the watchlist page (§6, §11). Owner-scoped, keyset-paginated. The first page is server-
+    rendered inline (deep-link + no-JS baseline); a self-replacing HTMX sentinel that reuses the 2.4/3.4 keyset
+    grammar (hx-trigger="revealed" / hx-swap="outerHTML" / terminal state) advances it. Filter chips carry per-
+    status counts; a status filter round-trips through the chip + sentinel URLs so HasMore/cursor reflect the
+    filtered set. Two empty states: a totally-empty "start your watchlist" (Discover CTA) and a quiet empty-
+    filter message with the chips still shown. All HTMX is attribute-driven — no hx-on, no inline JS — so the
+    strict script-src 'self' CSP is untouched. This is a functional baseline; the frontend pass elevates styling.
+*@
+<section class="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
+    <div class="animate-rise-in">
+        <p class="text-xs font-semibold uppercase tracking-widest text-accent">Your library</p>
+        <h1 class="mt-2 font-display text-4xl text-ink">Watchlist</h1>
+        <p class="mt-3 text-lg text-ink-muted">Everything you&rsquo;re planning, watching, and have watched.</p>
+    </div>
+
+    @* One persistent polite node (mirrors #feed-status): the frontend pass wires site.ts to copy a concise
+       announcement here after a load-more swap. The sentinel itself is attribute-only, so load-more works now. *@
+    <span id="watchlist-page-status" class="sr-only" role="status" aria-live="polite"></span>
+
+    @if (counts.Total == 0)
+    {
+        @* Empty state 1 — no entries at all: a calm "start your watchlist" prompt with a Discover CTA, never an
+           error. The stable data-watchlist-empty marker lets tests assert the state without coupling to copy. *@
+        <div data-watchlist-empty="none" class="mt-10 card-glass px-6 py-12 text-center">
+            <h2 class="font-display text-2xl text-ink">Start your watchlist</h2>
+            <p class="mx-auto mt-3 max-w-md text-sm text-ink-muted">
+                Save the movies and series you want to watch. Browse titles and add them from any card or the
+                title page &mdash; they&rsquo;ll gather here.
+            </p>
+            <div class="mt-6 flex justify-center">
+                <a asp-controller="Discovery" asp-action="Index" class="btn btn-primary text-sm">Discover titles</a>
+            </div>
+        </div>
+    }
+    else
+    {
+        @* Filter chips with counts (§6.3) — each a GET link that re-scopes the page while preserving the sort. *@
+        <nav aria-label="Filter by status" class="mt-8 flex flex-wrap items-center gap-2">
+            @foreach (var chip in chips)
+            {
+                var isActive = active == chip.Status;
+                var href = Url.Action("Index", "Watchlist", new { status = chip.Status?.ToString(), sort = sort.ToString() });
+                <a href="@href"
+                   aria-current="@(isActive ? "page" : null)"
+                   class="inline-flex items-center gap-2 rounded-pill border px-3.5 py-1.5 text-sm font-medium transition-colors @(isActive ? "border-accent/60 bg-accent/15 text-ink" : "border-white/10 text-ink-muted hover:bg-white/5 hover:text-ink")">
+                    <span>@chip.Label</span>
+                    <span class="rounded-pill bg-white/10 px-1.5 py-0.5 text-xs tabular-nums text-ink-subtle"
+                          data-watchlist-count="@(chip.Status?.ToString() ?? "All")">@counts.CountFor(chip.Status)</span>
+                </a>
+            }
+        </nav>
+
+        @* Sort control — a no-JS GET form that preserves the active filter. The sort surface is intentionally
+           small and index-backed (§6.1); more sorts appear here automatically as the enum grows. *@
+        <form method="get" class="mt-4 flex items-center gap-2">
+            <input type="hidden" name="status" value="@active?.ToString()" />
+            <label for="watchlist-sort" class="text-sm text-ink-muted">Sort</label>
+            <select id="watchlist-sort" name="sort" class="select-field">
+                @foreach (var option in Enum.GetValues<WatchlistSort>())
+                {
+                    <option value="@option" selected="@(option == sort)">@SortLabel(option)</option>
+                }
+            </select>
+            <button type="submit" class="btn btn-ghost text-sm">Apply</button>
+        </form>
+
+        @if (page.Items.Count == 0)
+        {
+            @* Empty state 2 — entries exist, but none in the selected status: a quiet filtered-empty message
+               with the chips still shown above. Not an error. *@
+            var activeLabel = chips.First(chip => chip.Status == active).Label;
+            <div data-watchlist-empty="filter" class="mt-8 card-glass px-6 py-12 text-center">
+                <h2 class="font-display text-2xl text-ink">Nothing marked &ldquo;@activeLabel&rdquo; yet</h2>
+                <p class="mx-auto mt-3 max-w-md text-sm text-ink-muted">
+                    Switch filters above, or add more titles from across Cinora.
+                </p>
+            </div>
+        }
+        else
+        {
+            @* The grid is a labelled list — an sr-only heading names it, and tabindex="-1" lets the frontend
+               pass move focus here after a swap (consistent with _SearchResults / #feed-items). *@
+            <h2 id="watchlist-heading" class="sr-only">Your watchlist titles</h2>
+            <ul id="watchlist-items" role="list" tabindex="-1" aria-labelledby="watchlist-heading"
+                class="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5 md:grid-cols-4 lg:grid-cols-5">
+                @foreach (var item in page.Items)
+                {
+                    <li><partial name="_WatchlistCard" model="item" /></li>
+                }
+
+                @if (nextUrl is not null)
+                {
+                    @* Self-replacing sentinel: when revealed it GETs the next page and REPLACES itself
+                       (outerHTML) with _WatchlistPage (next cards + a fresh sentinel, or a terminal marker). *@
+                    <li hx-get="@nextUrl" hx-trigger="revealed" hx-swap="outerHTML" aria-hidden="true">
+                        <div class="skeleton-shimmer aspect-[2/3] rounded-card"></div>
+                        <div class="skeleton-shimmer mt-3 h-3.5 w-3/4 rounded-pill"></div>
+                        <div class="skeleton-shimmer mt-2 h-3 w-1/3 rounded-pill"></div>
+                    </li>
+                }
+            </ul>
+
+            @* Live-removal empty state (Milestone 4.4): a HIDDEN sibling of the grid, revealed by Scripts/site.ts
+               when the LAST visible card is removed in place — so the grid never collapses to a confusing blank.
+               Copy mirrors the two server empty states and is chosen by the active filter: the "All" view empties
+               to "start your watchlist" (with the Discover CTA), a filtered view to the quiet empty-filter
+               message. tabindex="-1" lets focus land here after the final removal. It carries a DISTINCT hook
+               (data-watchlist-live-empty, not data-watchlist-empty) and stays hidden until needed, so the WP4
+               server-rendered empty-state assertions are untouched. *@
+            <div data-watchlist-live-empty hidden tabindex="-1"
+                 class="mt-8 card-glass px-6 py-12 text-center animate-rise-in">
+                @if (active is null)
+                {
+                    <h2 class="font-display text-2xl text-ink">Start your watchlist</h2>
+                    <p class="mx-auto mt-3 max-w-md text-sm text-ink-muted">
+                        You&rsquo;ve cleared your watchlist. Browse titles and add them from any card or the title
+                        page &mdash; they&rsquo;ll gather here.
+                    </p>
+                    <div class="mt-6 flex justify-center">
+                        <a asp-controller="Discovery" asp-action="Index" class="btn btn-primary text-sm">Discover titles</a>
+                    </div>
+                }
+                else
+                {
+                    var liveActiveLabel = chips.First(chip => chip.Status == active).Label;
+                    <h2 class="font-display text-2xl text-ink">Nothing marked &ldquo;@liveActiveLabel&rdquo; yet</h2>
+                    <p class="mx-auto mt-3 max-w-md text-sm text-ink-muted">
+                        Switch filters above, or add more titles from across Cinora.
+                    </p>
+                }
+            </div>
+        }
+    }
+</section>

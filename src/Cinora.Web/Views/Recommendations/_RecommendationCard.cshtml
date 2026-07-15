@@ -1,0 +1,88 @@
+@model RecommendationPick
+@{
+    var mediaSegment = Model.Media.ToString().ToLowerInvariant();
+    var detailsHref = $"/discover/title/{mediaSegment}/{Model.TmdbId}";
+    var year = Model.ReleaseYear;
+
+    // One accessible name for the whole card link: title + year (RecommendationPick carries no rating, so — unlike
+    // _TitleCard — there is no "rated N out of 10" fragment and NO rating badge is rendered).
+    var accessibleName = Model.Title + (year is { } y ? $" ({y})" : string.Empty);
+
+    // Status is NULL by construction: a served pick is never already reviewed/watchlisted (the candidate pipeline
+    // excludes both — design §5.1), so the card is N+1-free (no per-card status query). The upsert POST is
+    // idempotent, so the rare staleness (a pick watchlisted since the last nightly refresh) self-heals.
+    var control = new WatchlistControlVm(Model.TmdbId, Model.Media, Status: null, IsAuthenticated: true);
+
+    var dismissUrl = $"/recommendations/{Model.TmdbId}/dismiss";
+    // hx-vals carries the media in the POST body; the anti-forgery token rides the RequestVerificationToken header
+    // site.ts attaches globally (no form / hidden field needed). Razor encodes the enum name in the attribute.
+    var dismissVals = $"{{\"media\":\"{Model.Media}\"}}";
+    var dismissLabel = $"Dismiss {Model.Title}";
+    var dismissAnnounce = $"Dismissed {Model.Title}";
+}
+
+@*
+    Milestone 5.4 — one "For You" recommendation card (poster + title + year + a model-authored "why this"
+    caption + the reusable _WatchlistControl overlay + a dismiss control). Rendered inside a host-provided
+    <li data-rec-item> (the /recommendations grid and the /home rail), which is the dismiss swap target.
+
+    Two INTERACTIVE controls (watchlist + dismiss) are absolutely-positioned SIBLINGS of the details <a>, never
+    nested in it (an interactive control cannot live inside an anchor). Motion is transform/opacity only and the
+    global reduced-motion rule collapses it. Reason is UNTRUSTED model text → default Razor-encoded (@Model.Reason),
+    NEVER Html.Raw (it is already length-capped server-side).
+*@
+<div class="relative">
+    <a href="@detailsHref" class="poster-card" aria-label="@accessibleName">
+        <div class="poster-frame aspect-[2/3]">
+            <img asp-tmdb-poster="@Model.PosterPath" asp-tmdb-size="W342" alt="@Model.Title"
+                 class="poster-img" />
+
+            @* Cinematic base vignette for depth — decorative only, in the page surface tone. *@
+            <div class="pointer-events-none absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-surface-0/60 to-transparent"
+                 aria-hidden="true"></div>
+        </div>
+
+        <div class="mt-3">
+            <h3 class="truncate text-sm font-medium text-ink" title="@Model.Title">@Model.Title</h3>
+            @if (year is { } yr)
+            {
+                <p class="mt-0.5 text-xs text-ink-subtle">@yr</p>
+            }
+        </div>
+    </a>
+
+    @* "Why this" — the model's explanation, OUTSIDE the anchor so it is not folded into the link's accessible
+       name. Default Razor-encoded untrusted text (NEVER Html.Raw); clamped to two lines. Rendered
+       UNCONDITIONALLY with a two-line min-height (min-h-9) so every card reserves the SAME caption height —
+       this keeps the rail/grid uniform and, crucially, lets the /home skeleton reserve the exact same space so
+       the friends feed below does not shift when a captioned set swaps in (CLS fix). Empty when no reason. *@
+    <p class="mt-1.5 line-clamp-2 min-h-9 text-xs leading-snug text-ink-muted">@Model.Reason</p>
+
+    @* Add-to-watchlist overlay (top-left) — a sibling of the anchor. Status is null by construction (see above). *@
+    <div class="absolute left-2 top-2 z-10">
+        <partial name="_WatchlistControl" model="control" />
+    </div>
+
+    @*
+        Dismiss (top-right) — PURE HTMX, no Alpine. Removes THIS card's <li> (hx-target="closest li",
+        hx-swap="outerHTML" + a 200ms fade). v1 persists nothing (durable "not interested" deferred, ADR 0018 §11);
+        the anti-forgery token rides the header, and the SocialWrite rate limit guards the POST server-side. A real
+        <button> is keyboard-operable with the global gold focus ring; data-rec-announce feeds the polite
+        #recommendations-status region (site.ts). It is `.js-only` — the dismiss is HTMX-only with NO no-JS
+        fallback, so (mirroring the _WatchlistControl "Remove" precedent) it is hidden in the no-JS DOM and never
+        ships as a dead, focusable control. No hx-on / no inline JS → the strict CSP is untouched.
+    *@
+    <button type="button"
+            hx-post="@dismissUrl"
+            hx-vals="@dismissVals"
+            hx-target="closest li"
+            hx-swap="outerHTML swap:200ms"
+            data-rec-announce="@dismissAnnounce"
+            aria-label="@dismissLabel"
+            title="Dismiss"
+            class="rec-dismiss absolute right-2 top-2 z-10 js-only">
+        <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+        </svg>
+    </button>
+</div>

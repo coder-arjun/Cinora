@@ -1,0 +1,75 @@
+@model ProfileSettingsViewModel
+@using Cinora.Web.Infrastructure
+
+@*
+    Milestone 4.2 — the display-name + privacy fragment (§4.2), elevated to the luxury design system in Step C.
+    Posts to POST /settings/profile; under HTMX it self-swaps (hx-target=#profile-form, innerHTML) with the
+    re-rendered fragment. The MVC form tag helper emits the anti-forgery hidden field the global
+    AutoValidateAntiforgeryToken validates (and site.ts also attaches the token header). A no-JS post redirects
+    back on success; on a validation failure the inline #settings-error alert (site.ts, HTMX path) surfaces the
+    message. Field names match UpdateProfileForm (DisplayName, IsProfilePublic) so binding flows straight through.
+
+    A11y: the privacy options are REAL radios in a <fieldset>/<legend> (keyboard + SR grouping for free), wrapped
+    in selectable cards whose checked/focus state is CSS-driven (has-[:checked] / has-[:focus-visible]); the native
+    :focus-visible ring stays on the radio itself. The "Saved" note is visual-only (aria-hidden) — the reliable SR
+    confirmation rides the persistent #settings-status polite node in EditProfile (a freshly-inserted role="status"
+    is unreliable to announce; mirrors the 3.3 friends pattern).
+*@
+<form asp-controller="Settings" asp-action="UpdateProfile" method="post"
+      hx-post="/settings/profile" hx-target="#profile-form" hx-swap="innerHTML"
+      class="space-y-8">
+    <div class="space-y-2">
+        <label asp-for="DisplayName" class="label">Display name</label>
+        <input asp-for="DisplayName" type="text" autocomplete="name" maxlength="100" required
+               aria-describedby="display-name-hint display-name-error"
+               class="input" />
+        <span id="display-name-error" asp-validation-for="DisplayName" class="field-validation-error"></span>
+        <p id="display-name-hint" class="text-xs text-ink-subtle">This is how friends see you across Cinora.</p>
+    </div>
+
+    <fieldset class="space-y-3">
+        <legend class="label">Profile visibility</legend>
+        <p class="-mt-1 text-xs text-ink-subtle">Choose who can see your reviews and activity.</p>
+
+        <div class="grid gap-3 sm:grid-cols-2">
+            <label class="flex cursor-pointer items-start gap-3 rounded-card border border-white/10 bg-surface-1/40 p-4 transition-colors hover:border-white/20 has-[:checked]:border-accent/70 has-[:checked]:bg-accent/5 has-[:focus-visible]:border-accent">
+                <input asp-for="IsProfilePublic" type="radio" value="true" id="visibility-public" class="mt-0.5 accent-accent" />
+                <span class="min-w-0">
+                    <span class="block text-sm font-semibold text-ink">Public</span>
+                    <span class="mt-1 block text-xs text-ink-subtle">Anyone signed in can see your reviews and activity.</span>
+                </span>
+            </label>
+            <label class="flex cursor-pointer items-start gap-3 rounded-card border border-white/10 bg-surface-1/40 p-4 transition-colors hover:border-white/20 has-[:checked]:border-accent/70 has-[:checked]:bg-accent/5 has-[:focus-visible]:border-accent">
+                <input asp-for="IsProfilePublic" type="radio" value="false" id="visibility-friends" class="mt-0.5 accent-accent" />
+                <span class="min-w-0">
+                    <span class="block text-sm font-semibold text-ink">Friends only</span>
+                    <span class="mt-1 block text-xs text-ink-subtle">Only accepted friends can see your reviews and activity.</span>
+                </span>
+            </label>
+        </div>
+    </fieldset>
+
+    <div class="space-y-2">
+        <label asp-for="DefaultLanguage" class="label">Default movie language</label>
+        <select asp-for="DefaultLanguage" id="default-language" class="input">
+            @foreach (var option in LanguageOptions.All)
+            {
+                <option value="@option.Code">@option.Name</option>
+            }
+        </select>
+        <p class="text-xs text-ink-subtle">Discover opens in this language. &ldquo;Global&rdquo; shows worldwide titles.</p>
+    </div>
+
+    <div class="flex items-center gap-3">
+        <button type="submit" class="btn btn-primary text-sm">Save changes</button>
+        @if (Model.Saved)
+        {
+            <span class="inline-flex items-center gap-1.5 text-sm font-medium text-accent" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                </svg>
+                Saved
+            </span>
+        }
+    </div>
+</form>

@@ -1,0 +1,39 @@
+@model ReviewListVm
+@{
+    var reviews = Model.Reviews;
+    var mediaSegment = Model.Media.ToString().ToLowerInvariant();
+
+    string? nextUrl = null;
+    if (reviews.HasMore && reviews.NextCursor is { } cursor)
+    {
+        nextUrl = Url.Action("Reviews", "Discovery", new
+        {
+            media = mediaSegment,
+            tmdbId = Model.TmdbId,
+            cursorCreatedAt = cursor.CreatedAtUtc.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+            cursorId = cursor.Id,
+        });
+    }
+}
+
+@*
+    Milestone 3.1 — the load-more fragment (a cursor request). Returned by the sentinel's hx-get and swapped
+    via outerHTML in place of that sentinel, so these cards append to #reviews-list-items. Iff HasMore, a FRESH
+    sentinel re-arms the chain toward the next keyset page; otherwise a quiet terminal marker ends it (no
+    sentinel → the chain stops). Attribute-only HTMX — no hx-on, no inline JS.
+*@
+@foreach (var review in reviews.Items)
+{
+    <partial name="_ReviewCard" model="review" />
+}
+
+@if (nextUrl is not null)
+{
+    <div hx-get="@nextUrl" hx-trigger="revealed" hx-swap="outerHTML" aria-hidden="true">
+        <div class="skeleton-shimmer h-28 rounded-card"></div>
+    </div>
+}
+else if (reviews.Items.Count > 0)
+{
+    <p class="py-4 text-center text-sm text-ink-subtle">You&rsquo;ve reached the end.</p>
+}

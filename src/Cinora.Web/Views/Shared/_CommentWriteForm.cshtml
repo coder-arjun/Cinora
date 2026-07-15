@@ -1,0 +1,21 @@
+@model CommentWriteFormVm
+
+@*
+    Milestone 3.2 — the add-comment form. Uses the MVC form tag helper (asp-controller/asp-action) so a hidden
+    __RequestVerificationToken is injected — satisfying both the no-JS POST and the HTMX path (hx-post includes
+    the form fields). Under JS, HTMX appends the returned _CommentCard into the cards-only #comment-items list
+    (beforeend) — NOT the whole thread region, so a new comment never renders after the empty-state or below
+    the load-more sentinel (H3). No inline JS; the strict CSP is untouched. The submitted body is Razor
+    output-encoded on render (XSS-safe).
+*@
+<form class="mt-3 flex items-start gap-2"
+      asp-controller="Comments" asp-action="Add" asp-route-id="@Model.ReviewId" method="post"
+      hx-post="/reviews/@Model.ReviewId/comments"
+      hx-target="#comment-items-@Model.ReviewId"
+      hx-swap="beforeend">
+    <label class="sr-only" for="comment-body-@Model.ReviewId">Add a comment</label>
+    <textarea class="input flex-1" id="comment-body-@Model.ReviewId" name="Body" rows="1"
+              maxlength="@Cinora.Domain.Entities.Comment.BodyMaxLength"
+              placeholder="Add a comment&hellip;" required></textarea>
+    <button type="submit" class="btn btn-primary shrink-0 text-sm">Comment</button>
+</form>

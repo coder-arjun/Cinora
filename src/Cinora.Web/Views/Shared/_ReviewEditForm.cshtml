@@ -1,0 +1,56 @@
+@model ReviewVm
+@{
+    var cardId = $"review-{Model.ReviewId}";
+    var ratingId = $"edit-rating-{Model.ReviewId}";
+    var bodyId = $"edit-body-{Model.ReviewId}";
+}
+
+@*
+    Milestone 3.1 — the inline edit form. It replaces the card in place (same #review-{id} root, outerHTML) and
+    posts back the updated card. Anti-forgery rides the RequestVerificationToken header Scripts/site.ts attaches
+    to the hx-post; the ownership check is re-run server-side in EditReviewCommand. Attribute-driven HTMX only —
+    no inline JS. The textarea content is Razor output-encoded (a <script> body shows as literal text, never
+    executes).
+*@
+<form id="@cardId"
+      class="card-glass space-y-4 p-5 sm:p-6"
+      hx-post="/reviews/@Model.ReviewId"
+      hx-target="#@cardId"
+      hx-swap="outerHTML">
+    <h3 class="font-display text-lg text-ink">Edit your review</h3>
+
+    @* No-JS 400 path: model-level errors here; field errors render inline via asp-validation-for below. *@
+    <div asp-validation-summary="ModelOnly" class="text-sm"></div>
+
+    <div>
+        <label class="label" for="@ratingId">Your rating (1&ndash;10)</label>
+        @* Rating input echoing the card's gold-star N/10 pill: labelled, keyboard-operable numeric field
+           (native ↑/↓ stepping) with a star affix + "/10" suffix — not a mouse-only star widget. *@
+        <div class="relative max-w-[10rem]">
+            <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center ps-3 text-accent" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+                    <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 .5l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+                </svg>
+            </span>
+            <input class="input ps-9 pe-11 font-semibold" id="@ratingId" type="number" name="Rating"
+                   min="1" max="10" step="1" inputmode="numeric" value="@Model.Rating" required />
+            <span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pe-3 text-sm text-ink-muted" aria-hidden="true">/10</span>
+        </div>
+        <span asp-validation-for="Rating" class="field-validation-error"></span>
+    </div>
+    <div>
+        <label class="label" for="@bodyId">Your review</label>
+        <textarea class="input" id="@bodyId" name="Body" rows="4"
+                  maxlength="@Cinora.Domain.Entities.Review.BodyMaxLength" required>@Model.Body</textarea>
+        <span asp-validation-for="Body" class="field-validation-error"></span>
+    </div>
+    <div class="flex flex-wrap gap-2">
+        <button type="submit" class="btn btn-primary text-sm">Save changes</button>
+        <button type="button" class="btn btn-ghost text-sm"
+                hx-get="/reviews/@Model.ReviewId"
+                hx-target="#@cardId"
+                hx-swap="outerHTML">
+            Cancel
+        </button>
+    </div>
+</form>

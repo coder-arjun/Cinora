@@ -1,0 +1,58 @@
+@model PendingRequestVm
+@{
+    var cardId = $"request-{Model.RequestId}";
+}
+
+@*
+    Milestone 3.3 — one pending friend request row. An INCOMING request (addressed to the current user) offers
+    Accept/Decline (attribute-driven hx-post targeting this row; the handler enforces addressee-only response);
+    an OUTGOING request shows a "Request sent" badge plus a Cancel action (§5). The other party's name links to
+    their profile and is Razor output-encoded. No inline JS; the
+    anti-forgery token rides the RequestVerificationToken header Scripts/site.ts attaches. Accept/Decline swap
+    this row with the returned _FriendActionResult status line.
+*@
+<article id="@cardId" data-pending-request class="flex items-center gap-3 rounded-card border border-white/5 bg-surface-1/40 px-4 py-3">
+    @* Milestone 4.2 Step B — the requester's/addressee's real avatar (or the monogram fallback) via the shared
+       _Avatar seam. Decorative: the other party's name link beside it already names the user. *@
+    <partial name="_Avatar" model="new AvatarViewModel(Model.OtherDisplayName, Model.OtherAvatarFileKey, AvatarSize.Medium, Decorative: true)" />
+
+    <div class="min-w-0 flex-1">
+        <a asp-controller="Profiles" asp-action="Profile" asp-route-id="@Model.OtherUserId" title="@Model.OtherDisplayName"
+           class="block truncate text-sm font-semibold text-ink transition-colors hover:text-accent">@Model.OtherDisplayName</a>
+        <p class="text-xs text-ink-subtle">@(Model.IsIncoming ? "wants to be your friend" : "Awaiting a response")</p>
+    </div>
+
+    @if (Model.IsIncoming)
+    {
+        <div class="flex shrink-0 items-center gap-2">
+            <button type="button" class="btn btn-primary text-sm"
+                    hx-post="/friends/requests/@Model.RequestId/accept"
+                    hx-target="#@cardId"
+                    hx-swap="outerHTML">
+                Accept
+            </button>
+            <button type="button" class="btn btn-ghost text-sm"
+                    hx-post="/friends/requests/@Model.RequestId/decline"
+                    hx-target="#@cardId"
+                    hx-swap="outerHTML">
+                Decline
+            </button>
+        </div>
+    }
+    else
+    {
+        @* Outgoing (awaiting a response): the "Request sent" badge plus a Cancel action (§5). Cancel is
+           requester-only (enforced in the handler) and swaps this row with the returned status line. *@
+        <div class="flex shrink-0 items-center gap-2">
+            <span class="inline-flex items-center rounded-pill border border-white/10 bg-surface-2/60 px-3 py-1 text-xs font-medium text-ink-subtle">
+                Request sent
+            </span>
+            <button type="button" class="btn btn-ghost text-sm"
+                    hx-post="/friends/requests/@Model.RequestId/cancel"
+                    hx-target="#@cardId"
+                    hx-swap="outerHTML">
+                Cancel
+            </button>
+        </div>
+    }
+</article>

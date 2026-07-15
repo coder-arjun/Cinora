@@ -1,0 +1,71 @@
+@model NotificationSettingsViewModel
+
+@*
+    Milestone 6.3 — the per-type push-preference toggles fragment. Posts to POST /settings/notifications; under HTMX
+    it self-swaps (hx-target=#notification-prefs-form, innerHTML) with the re-rendered fragment. The MVC form tag
+    helper emits the anti-forgery hidden field the global AutoValidateAntiforgeryToken validates (site.ts also
+    attaches the token header). A no-JS post redirects back on success.
+
+    A11y: each toggle is a REAL <input type="checkbox"> (keyboard + SR native), hand-rolled with an explicit
+    name/value plus a paired hidden "false" companion input (NOT asp-for) — an unchecked box still binds false
+    (not "missing"), making the four flags deterministic. The checkbox is visually replaced by a CSS switch
+    (peer-checked / peer-focus-visible drive the
+    track + thumb); the native focus ring rides the visual switch. Field names match UpdateNotificationPreferencesForm
+    so binding flows straight through. The "Saved" note is visual-only (aria-hidden) — the reliable SR confirmation
+    rides the persistent #settings-status polite node in Notifications.cshtml.
+*@
+<form asp-controller="Settings" asp-action="UpdateNotifications" method="post"
+      hx-post="/settings/notifications" hx-target="#notification-prefs-form" hx-swap="innerHTML"
+      class="space-y-6">
+    <ul class="space-y-3" role="group" aria-labelledby="what-to-push-heading">
+        @{
+            var toggles = new (string For, string Title, string Hint)[]
+            {
+                (nameof(Model.PushReviewLikes), "Likes on your reviews", "When someone likes a review you wrote."),
+                (nameof(Model.PushComments), "Comments on your reviews", "When someone comments on a review you wrote."),
+                (nameof(Model.PushFriendRequests), "Friend requests", "When someone sends you a friend request."),
+                (nameof(Model.PushFriendAccepted), "Friend request accepted", "When someone accepts your friend request."),
+            };
+            var values = new Dictionary<string, bool>
+            {
+                [nameof(Model.PushReviewLikes)] = Model.PushReviewLikes,
+                [nameof(Model.PushComments)] = Model.PushComments,
+                [nameof(Model.PushFriendRequests)] = Model.PushFriendRequests,
+                [nameof(Model.PushFriendAccepted)] = Model.PushFriendAccepted,
+            };
+        }
+        @foreach (var (field, title, hint) in toggles)
+        {
+            <li>
+                <label class="flex cursor-pointer items-center justify-between gap-4 rounded-card border border-white/10 bg-surface-1/40 p-4 transition-colors hover:border-white/20 has-[:checked]:border-accent/50 has-[:checked]:bg-accent/5">
+                    <span class="min-w-0">
+                        <span class="block text-sm font-semibold text-ink">@title</span>
+                        <span class="mt-0.5 block text-xs text-ink-muted">@hint</span>
+                    </span>
+                    <span class="relative inline-flex shrink-0 items-center">
+                        <input type="checkbox" name="@field" value="true" checked="@values[field]"
+                               class="peer sr-only" aria-label="@title" />
+                        <input type="hidden" name="@field" value="false" />
+                        <span aria-hidden="true"
+                              class="h-6 w-11 rounded-pill bg-surface-2 ring-1 ring-inset ring-control-border transition-colors peer-checked:bg-accent peer-focus-visible:ring-2 peer-focus-visible:ring-accent"></span>
+                        <span aria-hidden="true"
+                              class="pointer-events-none absolute left-1 h-4 w-4 rounded-pill bg-ink-subtle transition-transform peer-checked:translate-x-5 peer-checked:bg-on-accent"></span>
+                    </span>
+                </label>
+            </li>
+        }
+    </ul>
+
+    <div class="flex items-center gap-3">
+        <button type="submit" class="btn btn-primary text-sm">Save changes</button>
+        @if (Model.Saved)
+        {
+            <span class="inline-flex items-center gap-1.5 text-sm font-medium text-accent" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                </svg>
+                Saved
+            </span>
+        }
+    </div>
+</form>

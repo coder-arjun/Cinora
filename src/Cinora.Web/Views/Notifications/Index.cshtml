@@ -1,0 +1,84 @@
+@model NotificationListVm
+@{
+    ViewData["Title"] = "Notifications";
+
+    string? nextUrl = null;
+    if (Model.HasMore && Model.NextCursor is { } cursor)
+    {
+        nextUrl = Url.Action("Feed", "Notifications", new
+        {
+            cursorCreatedAt = cursor.CreatedAtUtc.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+            cursorId = cursor.Id,
+        });
+    }
+}
+
+@*
+    Milestone 3.5 — the notifications inbox. The first keyset page is server-rendered inline (deep-link + no-JS
+    baseline); a self-replacing HTMX sentinel that reuses the 3.4 keyset/sentinel grammar
+    (hx-trigger="revealed" / hx-swap="outerHTML" / terminal state) advances it. The inbox is addressed only by
+    its opaque (cursorCreatedAt, cursorId) keyset cursor. All HTMX is attribute-driven — no hx-on, no inline JS —
+    so the strict script-src/connect-src 'self' CSP is untouched (the same-origin hub WebSocket is admitted by
+    connect-src 'self'; N6). All user text is Razor output-encoded by the _NotificationItem partial (§3).
+*@
+<section class="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+    <div class="flex flex-wrap items-end justify-between gap-4 animate-rise-in">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-widest text-accent">Your activity</p>
+            <h1 class="mt-2 font-display text-4xl text-ink">Notifications</h1>
+            <p class="mt-3 text-lg text-ink-muted">
+                @if (Model.UnreadCount > 0)
+                {
+                    <span>You have @Model.UnreadCount unread notification@(Model.UnreadCount == 1 ? "" : "s").</span>
+                }
+                else
+                {
+                    <span>You&rsquo;re all caught up.</span>
+                }
+            </p>
+        </div>
+
+        @* Mark-all-as-read — a real anti-forgery form (works no-JS; the frontend can enhance to an HTMX swap). *@
+        @if (Model.UnreadCount > 0)
+        {
+            <form asp-controller="Notifications" asp-action="ReadAll" method="post">
+                <button type="submit" class="btn btn-ghost text-sm">Mark all as read</button>
+            </form>
+        }
+    </div>
+
+    @* One persistent polite node (mirrors #feed-status): site.ts may copy a concise announcement here after a
+       page swap. The load-more sentinel itself is attribute-only. *@
+    <span id="notification-status" class="sr-only" role="status" aria-live="polite"></span>
+
+    @if (Model.Items.Count == 0)
+    {
+        @* Empty state — no notifications yet. The stable data-notifications-empty marker lets tests assert the
+           state without coupling to copy. *@
+        <div data-notifications-empty class="mt-10 card-glass px-6 py-12 text-center">
+            <h2 class="font-display text-2xl text-ink">Nothing here yet</h2>
+            <p class="mx-auto mt-3 max-w-md text-sm text-ink-muted">
+                When someone likes or comments on your review, or sends you a friend request, you&rsquo;ll see it
+                here. Start by <a class="link" asp-controller="Discovery" asp-action="Index">discovering titles</a>
+                and reviewing what you watch.
+            </p>
+        </div>
+    }
+    else
+    {
+        <h2 id="notifications-heading" class="sr-only">Your notifications</h2>
+        <ul id="notification-items" role="list" tabindex="-1" aria-labelledby="notifications-heading" class="mt-8 space-y-3">
+            @foreach (var item in Model.Items)
+            {
+                <partial name="_NotificationItem" model="item" />
+            }
+
+            @if (nextUrl is not null)
+            {
+                <li hx-get="@nextUrl" hx-trigger="revealed" hx-swap="outerHTML" aria-hidden="true">
+                    <div class="skeleton-shimmer h-20 rounded-card"></div>
+                </li>
+            }
+        </ul>
+    }
+</section>

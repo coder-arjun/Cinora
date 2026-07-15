@@ -1,0 +1,45 @@
+@model FriendVm
+@{
+    var cardId = $"friend-{Model.UserId}";
+}
+
+@*
+    Milestone 3.3 — one accepted-friend card. The display name links to the friend's profile (/users/{id}) and
+    is Razor output-encoded (never Html.Raw). Remove is attribute-driven HTMX (hx-delete targeting this card) —
+    no inline JS, no hx-on — so the strict CSP is untouched; the anti-forgery token rides the
+    RequestVerificationToken header Scripts/site.ts attaches. The DELETE returns an empty 200 so HTMX removes
+    this node.
+*@
+<article id="@cardId" data-friend-card class="flex items-center gap-3 rounded-card border border-white/5 bg-surface-1/40 px-4 py-3">
+    @* Milestone 4.2 Step B — the friend's real avatar (or the monogram fallback) via the shared _Avatar seam.
+       Decorative: the friend name link beside it already names the user (no double SR announcement). *@
+    <partial name="_Avatar" model="new AvatarViewModel(Model.DisplayName, Model.AvatarFileKey, AvatarSize.Medium, Decorative: true)" />
+
+    <div class="min-w-0 flex-1">
+        <a asp-controller="Profiles" asp-action="Profile" asp-route-id="@Model.UserId" title="@Model.DisplayName"
+           class="block truncate text-sm font-semibold text-ink transition-colors hover:text-accent">@Model.DisplayName</a>
+    </div>
+
+    @* Start (or reopen) a 1:1 chat — full navigation to the conversation. The friends-only + block gate and
+       find-or-create live in the handler; the anti-forgery token is injected by the form tag helper. *@
+    <form asp-controller="Chat" asp-action="StartDirect" method="post" class="shrink-0">
+        <input type="hidden" name="OtherUserId" value="@Model.UserId" />
+        <button type="submit"
+                class="inline-flex min-h-9 items-center gap-1.5 rounded-btn px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/10">
+            <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path fill-rule="evenodd" d="M10 3c-4.418 0-8 2.91-8 6.5 0 1.86.96 3.53 2.5 4.7V18l3.06-1.7c.78.13 1.6.2 2.44.2 4.418 0 8-2.91 8-6.5S14.418 3 10 3z" clip-rule="evenodd" /></svg>
+            Message
+        </button>
+    </form>
+
+    <button type="button"
+            class="inline-flex min-h-9 items-center rounded-btn px-3 py-1.5 text-sm font-medium text-danger/90 transition-colors hover:bg-danger/10 hover:text-danger"
+            hx-delete="/friends/@Model.UserId"
+            hx-target="#@cardId"
+            hx-swap="outerHTML"
+            data-confirm-title="Remove friend?"
+            data-confirm-message="Remove @Model.DisplayName from your friends? You can send a new request later."
+            data-confirm-action="Remove"
+            data-confirm-tone="danger">
+        Remove
+    </button>
+</article>

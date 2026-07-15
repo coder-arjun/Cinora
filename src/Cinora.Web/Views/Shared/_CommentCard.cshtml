@@ -1,0 +1,68 @@
+@model CommentVm
+@{
+    var posted = Model.CreatedAtUtc.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture);
+    var cardId = $"comment-{Model.CommentId}";
+    // Milestone 6.5 (backlog 3.2) — only wrap a LONG body in the collapse component (a cheap char-length pre-gate;
+    // commentCollapse.ts then drops the control if it isn't genuinely truncated on this viewport). Short comments
+    // render as a plain <p>, so most cards carry no extra component.
+    var isLong = Model.Body.Length > 300;
+    var bodyId = $"comment-text-{Model.CommentId}";
+}
+
+@*
+    Milestone 3.2 — a single flat comment. XSS stance (§3): the body and display name are ALWAYS Razor
+    output-encoded (@Model.Body / @Model.AuthorDisplayName) — never Html.Raw — and line breaks use CSS
+    `white-space: pre-wrap`, never "\n" → <br>. The delete affordance renders ONLY when IsMine and is
+    attribute-driven HTMX (hx-delete targeting this card) — no inline JS, no hx-on — so the strict CSP is
+    untouched; the anti-forgery token rides the RequestVerificationToken header Scripts/site.ts attaches.
+*@
+<article id="@cardId" data-comment-card class="flex items-start gap-3 rounded-card border border-white/5 bg-surface-1/40 px-4 py-3">
+    @* Milestone 4.2 Step B — the comment author's real avatar (or the monogram fallback) via the shared _Avatar
+       seam. Decorative: the author name link beside it already names the user (no double SR announcement). *@
+    <partial name="_Avatar" model="new AvatarViewModel(Model.AuthorDisplayName, Model.AuthorAvatarFileKey, AvatarSize.Small, Decorative: true)" />
+
+    <div class="min-w-0 flex-1">
+        <div class="flex items-baseline gap-2">
+            @* Author name links to their profile (/users/{id}) so profiles are reachable from any comment. *@
+            <a asp-controller="Profiles" asp-action="Profile" asp-route-id="@Model.AuthorUserId" title="@Model.AuthorDisplayName"
+               class="block truncate text-xs font-semibold text-ink transition-colors hover:text-accent">@Model.AuthorDisplayName</a>
+            <time class="text-[11px] text-ink-subtle"
+                  datetime="@Model.CreatedAtUtc.ToString("o", System.Globalization.CultureInfo.InvariantCulture)">@posted</time>
+
+            @if (Model.IsMine)
+            {
+                <button type="button"
+                        class="ml-auto inline-flex min-h-8 items-center rounded-btn px-2.5 py-1 text-[11px] font-medium text-danger/90 transition-colors hover:bg-danger/10 hover:text-danger"
+                        hx-delete="/comments/@Model.CommentId"
+                        hx-target="#@cardId"
+                        hx-swap="outerHTML"
+                        data-confirm-title="Delete comment?"
+                        data-confirm-message="This permanently removes your comment. This can't be undone."
+                        data-confirm-action="Delete"
+                        data-confirm-tone="danger">
+                    Delete
+                </button>
+            }
+        </div>
+
+        @* Plain text, output-encoded, with CSS-preserved line breaks (never raw HTML / <br>). A long body is
+           collapsed to a one-way "Show more" (Milestone 6.5, backlog 3.2): the clamp is JS-gated so a no-JS
+           reader always sees the full text; the toggle is hidden until commentCollapse.ts confirms real overflow.
+           Bare-name @alpinejs/csp — x-data / x-ref / x-on:click only, no inline JS → the strict CSP is untouched. *@
+        @if (isLong)
+        {
+            <div class="mt-1" x-data="commentCollapse">
+                <p x-ref="body" id="@bodyId"
+                   class="comment-body is-clamped whitespace-pre-wrap break-words text-sm leading-relaxed text-ink-muted">@Model.Body</p>
+                <button type="button" x-ref="toggle" x-on:click="expand"
+                        class="comment-more mt-1 hidden" aria-expanded="false" aria-controls="@bodyId">
+                    Show more
+                </button>
+            </div>
+        }
+        else
+        {
+            <p class="comment-body mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink-muted">@Model.Body</p>
+        }
+    </div>
+</article>

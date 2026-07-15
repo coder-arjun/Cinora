@@ -1,0 +1,54 @@
+@model AvatarViewModel
+@*
+    The signed-in user's account menu (top bar, authenticated only; invoked from _Layout). Groups the user's name,
+    Settings and Log out into one professional dropdown under the avatar — replacing the three loose top-bar
+    controls. CSP-safe: the @@alpinejs/csp `accountMenu` component drives open/close with BARE-NAME bindings only
+    (no inline JS), so the strict script-src 'self' CSP is untouched. Progressive: the trigger is a real <button>
+    and Log out is a real anti-forgery-protected POST form.
+*@
+<div class="relative" x-data="accountMenu" x-on:keydown.escape="close">
+    <button type="button" x-on:click="toggle" x-bind:aria-expanded="open" aria-haspopup="menu"
+            class="inline-flex items-center gap-2 rounded-btn py-1 pl-1 pr-1.5 text-ink transition-colors hover:bg-white/5"
+            aria-label="Account menu">
+        <partial name="_Avatar" model="Model" />
+        <span class="hidden max-w-[10rem] truncate text-sm font-medium sm:inline">@Model.DisplayName</span>
+        <svg viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5 shrink-0 text-ink-subtle" aria-hidden="true">
+            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+        </svg>
+    </button>
+
+    <div x-show="open" x-cloak x-on:click.outside="close" role="menu" aria-label="Account"
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 -translate-y-1 scale-95"
+         x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+         x-transition:leave="transition ease-in duration-100"
+         x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+         x-transition:leave-end="opacity-0 -translate-y-1 scale-95"
+         class="absolute right-0 top-full z-50 mt-2 w-60 origin-top-right rounded-xl border border-white/10 bg-surface-0 p-1.5 shadow-2xl">
+        <div class="border-b border-white/10 px-3 pb-2.5 pt-1.5">
+            <p class="text-[0.7rem] uppercase tracking-widest text-ink-subtle">Signed in as</p>
+            <p class="truncate text-sm font-semibold text-ink" title="@Model.DisplayName">@Model.DisplayName</p>
+        </div>
+
+        <div class="mt-1.5 flex flex-col">
+            <a asp-controller="Settings" asp-action="EditProfile" role="menuitem" x-on:click="close"
+               class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-ink-muted transition-colors hover:bg-white/5 hover:text-ink">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" class="h-4 w-4 shrink-0" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5Z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.4 8.95a6.5 6.5 0 000-1.9l1.4-1.1-1.5-2.6-1.68.68a6.5 6.5 0 00-1.82-1.05L12.5 1.2h-3l-.3 1.78a6.5 6.5 0 00-1.82 1.05L5.7 3.35l-1.5 2.6 1.4 1.1a6.5 6.5 0 000 1.9l-1.4 1.1 1.5 2.6 1.68-.68c.55.44 1.16.8 1.82 1.05l.3 1.78h3l.3-1.78a6.5 6.5 0 001.82-1.05l1.68.68 1.5-2.6-1.4-1.1Z" />
+                </svg>
+                Settings
+            </a>
+
+            <form asp-controller="Account" asp-action="Logout" method="post" class="contents">
+                <button type="submit" role="menuitem"
+                        class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-ink-muted transition-colors hover:bg-white/5 hover:text-ink">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" class="h-4 w-4 shrink-0" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 7V5a1.5 1.5 0 00-1.5-1.5h-6A1.5 1.5 0 004 5v10a1.5 1.5 0 001.5 1.5h6A1.5 1.5 0 0013 15v-2M8.5 10H17m0 0-2.5-2.5M17 10l-2.5 2.5" />
+                    </svg>
+                    Log out
+                </button>
+            </form>
+        </div>
+    </div>
+</div>

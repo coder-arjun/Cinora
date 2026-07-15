@@ -1,0 +1,11 @@
+@model FriendActionResultVm
+
+@*
+    Milestone 3.3 — the on-brand status line an HTMX friend write (send / accept / decline) swaps in. The
+    message is server-composed and Razor output-encoded. It stays the VISIBLE confirmation; the reliable SR
+    announcement is copied into the persistent #friends-status node by Scripts/site.ts (a freshly-inserted
+    role="status" is often not announced). tabindex="-1" + data-friend-status-line let site.ts move focus here
+    after the swap so keyboard/SR focus is never dropped to <body> (WCAG 2.4.3). No inline JS; CSP untouched.
+*@
+<p role="status" data-friend-status-line tabindex="-1"
+   class="rounded-btn bg-surface-2/60 px-3 py-2 text-sm text-ink-muted">@Model.Message</p>

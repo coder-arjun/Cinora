@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="342" height="513" viewBox="0 0 342 513" fill="none" role="img" aria-label="No poster available">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c1c24"/>
+      <stop offset="1" stop-color="#131318"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e6c079" stop-opacity="0.10"/>
+      <stop offset="0.55" stop-color="#e6c079" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="342" height="513" fill="url(#bg)"/>
+  <rect width="342" height="513" fill="url(#glow)"/>
+
+  <!-- Clapperboard motif, centred; muted so it reads as a quiet placeholder, not decoration. -->
+  <g transform="translate(171 249)">
+    <g stroke="#4a4a57" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" fill="none">
+      <!-- board body -->
+      <rect x="-66" y="-4" width="132" height="82" rx="8"/>
+      <!-- hinged clapper top, opened slightly -->
+      <g transform="rotate(-8)">
+        <rect x="-70" y="-42" width="140" height="26" rx="5"/>
+        <path d="M-50 -42l13 26M-22 -42l13 26M6 -42l13 26M34 -42l13 26"/>
+      </g>
+    </g>
+    <!-- faint gold baseline — the single accent -->
+    <rect x="-66" y="86" width="132" height="4" rx="2" fill="#e6c079" opacity="0.22"/>
+  </g>
+</svg>

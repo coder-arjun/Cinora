@@ -1,0 +1,24 @@
+{
+  "id": 27205,
+  "title": "Inception",
+  "overview": "Cobb, a skilled thief who commits corporate espionage by infiltrating the subconscious of his targets.",
+  "tagline": "Your mind is the scene of the crime.",
+  "poster_path": "/inception_poster.jpg",
+  "backdrop_path": "/inception_backdrop.jpg",
+  "release_date": "2010-07-15",
+  "vote_average": 8.369,
+  "vote_count": 36000,
+  "runtime": 148,
+  "genres": [
+    { "id": 28, "name": "Action" },
+    { "id": 878, "name": "Science Fiction" },
+    { "id": 12, "name": "Adventure" }
+  ],
+  "credits": {
+    "cast": [
+      { "id": 27578, "name": "Elliot Page", "character": "Ariadne", "profile_path": null, "order": 2 },
+      { "id": 6193, "name": "Leonardo DiCaprio", "character": "Dom Cobb", "profile_path": "/leo.jpg", "order": 0 },
+      { "id": 24045, "name": "Joseph Gordon-Levitt", "character": "Arthur", "profile_path": "/jgl.jpg", "order": 1 }
+    ]
+  }
+}

@@ -1,0 +1,151 @@
+@model ProfileVm
+@{
+    ViewData["Title"] = Model.DisplayName;
+}
+
+@*
+    Milestone 3.3 — a privacy-shaped profile (§7.3). The handler projects ONLY the permitted data, so this
+    template simply renders what it was given: reviews appear only when CanViewReviews, the friends list only
+    when CanViewFriends. Display names and review bodies are Razor output-encoded throughout (never Html.Raw);
+    reviews reuse the shared _ReviewCard. The relationship control (Add friend / Respond / Remove) is a
+    self-swapping HTMX partial — no inline JS, strict CSP untouched.
+*@
+<section class="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+    @* Persistent polite node: site.ts copies a concise result here after the relationship control swaps
+       ("Request sent", "You are now friends", "Request declined", "Friend removed") — reliable SR feedback
+       that a freshly-inserted role="status" would not give (F3). *@
+    <span id="friends-status" class="sr-only" role="status" aria-live="polite"></span>
+
+    <header class="flex flex-col items-start gap-5 animate-rise-in sm:flex-row sm:items-center">
+        @* Milestone 4.2 Step B — the profile owner's real avatar (or the monogram fallback) via the shared _Avatar
+           seam. §7.3: name + avatar are in the "limited" tier, so the header avatar renders regardless of the
+           reviews/friends visibility gates below. Decorative: the <h1> display name beside it already names them. *@
+        <partial name="_Avatar" model="new AvatarViewModel(Model.DisplayName, Model.AvatarFileKey, AvatarSize.Large, Decorative: true, Eager: true)" />
+
+        <div class="min-w-0 flex-1">
+            <h1 class="font-display text-3xl text-ink">@Model.DisplayName</h1>
+            @if (Model.CanViewReviews)
+            {
+                <p class="mt-1 text-sm text-ink-subtle">
+                    @Model.FriendCount @(Model.FriendCount == 1 ? "friend" : "friends")
+                    · @Model.Reviews.Count @(Model.Reviews.Count == 1 ? "review" : "reviews")
+                </p>
+            }
+            else
+            {
+                <p class="mt-1 text-sm text-ink-subtle">This profile is private.</p>
+            }
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+            @* §11 — the profile owner gets an "Edit profile" link to the settings surface; non-owners get only
+               the relationship control. Owner is server-resolved in GetProfileQuery (never a UI-only gate). *@
+            @if (Model.Relationship == ProfileRelationship.Owner)
+            {
+                <a asp-controller="Settings" asp-action="EditProfile" class="btn btn-primary text-sm shrink-0">
+                    Edit profile
+                </a>
+            }
+            <partial name="_ProfileFriendControl" model="Model" />
+        </div>
+    </header>
+
+    @*
+        Milestone 4.5 — a privacy-shaped watchlist-highlights strip (§7): the owner's recent Watched titles,
+        a "what they've seen" poster row. GetProfileQuery fetches this ONLY when CanViewWatchlist (the same
+        §7.3 tier as reviews) — a limited/private view receives an empty list and this section is omitted
+        (quiet, never a stub). Reuses the discovery rails' premium poster styling (.rail / .rail-scroller /
+        .poster-card); each poster is one link to the Details route (the FIXED /discover/title/{media}/{tmdbId}
+        pattern from _TitleCard). Keyboard-reachable (the scroller scrolls with the arrow keys / trackpad) and
+        labelled for screen readers.
+    *@
+    @if (Model.CanViewWatchlist && Model.WatchlistHighlights.Count > 0)
+    {
+        <section class="mt-10" aria-labelledby="watchlist-highlights-heading">
+            <h2 id="watchlist-highlights-heading" class="font-display text-xl text-ink">Watched</h2>
+            <div class="rail mt-2">
+                <ul role="list" class="rail-scroller">
+                    @foreach (var highlight in Model.WatchlistHighlights)
+                    {
+                        var media = highlight.Media.ToString().ToLowerInvariant();
+                        var detailsHref = $"/discover/title/{media}/{highlight.TmdbId}";
+                        <li class="rail-item w-28 sm:w-32 lg:w-36">
+                            <a href="@detailsHref" class="poster-card" aria-label="@highlight.Title">
+                                <div class="poster-frame aspect-[2/3]">
+                                    <img asp-tmdb-poster="@highlight.PosterPath" asp-tmdb-size="W342"
+                                         alt="@highlight.Title" class="poster-img" />
+                                    <div class="pointer-events-none absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-surface-0/60 to-transparent"
+                                         aria-hidden="true"></div>
+                                </div>
+                                <div class="mt-2">
+                                    <h3 class="truncate text-sm font-medium text-ink" title="@highlight.Title">@highlight.Title</h3>
+                                </div>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </section>
+    }
+
+    @if (Model.CanViewReviews)
+    {
+        <div class="mt-10">
+            <h2 class="font-display text-xl text-ink">Reviews</h2>
+            @if (Model.Reviews.Count == 0)
+            {
+                <div class="card-glass mt-4 px-6 py-8 text-center">
+                    <p class="text-sm text-ink-muted">No reviews yet.</p>
+                </div>
+            }
+            else
+            {
+                <div class="mt-4 space-y-4">
+                    @foreach (var review in Model.Reviews)
+                    {
+                        <partial name="_ReviewCard" model="review" />
+                    }
+                </div>
+            }
+        </div>
+
+        @if (Model.CanViewFriends && Model.Friends.Count > 0)
+        {
+            <div class="mt-10">
+                <h2 class="font-display text-xl text-ink">Friends</h2>
+                @* Read-only on a profile (the Remove action lives on the owner's own /friends page). *@
+                <ul class="mt-4 grid gap-3 sm:grid-cols-2">
+                    @foreach (var friend in Model.Friends)
+                    {
+                        <li class="flex items-center gap-3 rounded-card border border-white/5 bg-surface-1/40 px-4 py-3">
+                            @* Milestone 4.2 Step B — real avatar (or monogram fallback) via the shared _Avatar seam.
+                               Decorative: the friend name link beside it already names the user. *@
+                            <partial name="_Avatar" model="new AvatarViewModel(friend.DisplayName, friend.AvatarFileKey, AvatarSize.Small, Decorative: true)" />
+                            <a asp-controller="Profiles" asp-action="Profile" asp-route-id="@friend.UserId" title="@friend.DisplayName"
+                               class="block truncate text-sm font-semibold text-ink transition-colors hover:text-accent">@friend.DisplayName</a>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    }
+    else
+    {
+        @* F6: relationship-aware private copy — but ALWAYS contains the word "private". *@
+        <div class="card-glass mt-10 px-6 py-10 text-center">
+            @if (Model.Relationship == ProfileRelationship.RequestOutgoing)
+            {
+                <p class="text-sm text-ink-muted">
+                    This profile is private. Request sent &mdash; you&rsquo;ll see @Model.DisplayName&rsquo;s
+                    reviews and activity once they accept.
+                </p>
+            }
+            else
+            {
+                <p class="text-sm text-ink-muted">
+                    @Model.DisplayName keeps their reviews and activity private. Send a friend request to see more.
+                </p>
+            }
+        </div>
+    }
+</section>

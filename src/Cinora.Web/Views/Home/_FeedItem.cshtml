@@ -1,0 +1,78 @@
+@model FeedItemVm
+@{
+    var posted = Model.CreatedAtUtc.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture);
+    var mediaSegment = Model.MovieMediaType.ToString().ToLowerInvariant();
+    var titleHref = $"/discover/title/{mediaSegment}/{Model.MovieTmdbId}";
+}
+
+@*
+    Milestone 3.4 — a single activity card: a friend reviewed a title. XSS stance (§3): the display name, the
+    movie title, and the body excerpt are ALWAYS Razor output-encoded (never Html.Raw); line breaks in the
+    excerpt are presented with `white-space: pre-wrap`. The card is display-only — feed v1 is reviews-only
+    (ADR 0012 §3), so it shows like/comment COUNTS for signal but exposes no like/comment actions of its own.
+    The poster thumbnail uses the same-origin-safe TMDB image tag helper (img-src covers it); its alt is empty
+    because the adjacent "reviewed {title}" text already names the title (no redundant SR announcement).
+*@
+<article class="card-glass p-5 sm:p-6">
+    <header class="flex items-start gap-3">
+        @* Milestone 4.2 Step B — the feed author's real avatar (or the monogram fallback) via the shared _Avatar
+           seam. Decorative: the "{author} reviewed {title}" line beside it already names the user. *@
+        <partial name="_Avatar" model="new AvatarViewModel(Model.AuthorDisplayName, Model.AuthorAvatarFileKey, AvatarSize.Small, Decorative: true)" />
+
+        <div class="min-w-0 flex-1">
+            <p class="text-sm text-ink-muted">
+                @* Inline links get a non-colour affordance too (underline on hover/focus), #6. *@
+                <a asp-controller="Profiles" asp-action="Profile" asp-route-id="@Model.AuthorUserId" title="@Model.AuthorDisplayName"
+                   class="font-semibold text-ink transition-colors hover:text-accent hover:underline focus-visible:underline">@Model.AuthorDisplayName</a>
+                <span class="text-ink-subtle">reviewed</span>
+                <a href="@titleHref" class="font-semibold text-ink transition-colors hover:text-accent hover:underline focus-visible:underline">@Model.MovieTitle</a>
+            </p>
+            <p class="text-xs text-ink-subtle">
+                <time datetime="@Model.CreatedAtUtc.ToString("o", System.Globalization.CultureInfo.InvariantCulture)">@posted</time>
+            </p>
+        </div>
+
+        <span class="inline-flex shrink-0 items-center gap-1 rounded-pill border border-white/10 bg-surface-2/80 px-3 py-1 text-sm font-semibold text-ink"
+              role="img" aria-label="Rated @Model.Rating out of 10">
+            <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4 text-accent" aria-hidden="true">
+                <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 .5l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+            </svg>
+            <span aria-hidden="true">@Model.Rating<span class="text-ink-muted">/10</span></span>
+        </span>
+    </header>
+
+    <div class="mt-4 flex gap-4">
+        @* Poster thumbnail linking to the title's Details page; fixed aspect frame reserves space (no CLS).
+           A DISTINCT accessible name from the title-text link above (#2) — same href, but not a duplicate SR
+           entry. *@
+        <a href="@titleHref" class="block w-16 shrink-0 sm:w-20" aria-label="@Model.MovieTitle poster">
+            <span class="block overflow-hidden rounded-card border border-white/10 aspect-[2/3]">
+                <img asp-tmdb-poster="@Model.MoviePosterPath" asp-tmdb-size="W185" alt=""
+                     class="h-full w-full object-cover" />
+            </span>
+        </a>
+
+        @* Plain text, output-encoded, with CSS-preserved line breaks (never raw HTML / <br>). *@
+        <p class="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink-muted">@Model.BodyExcerpt</p>
+    </div>
+
+    <footer class="mt-4 flex flex-wrap items-center gap-4 text-xs text-ink-subtle">
+        <span class="inline-flex items-center gap-1.5">
+            <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4 @(Model.LikedByMe ? "text-accent" : "text-ink-subtle")" aria-hidden="true">
+                <path d="M9.653 16.915l-.005-.003-.019-.01a20.759 20.759 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002a.739.739 0 01-.69.001l-.002-.001z" />
+            </svg>
+            @Model.LikeCount @(Model.LikeCount == 1 ? "like" : "likes")
+            @* #5: the gold heart tint is colour-only — name the "liked by you" state for SR too. *@
+            @if (Model.LikedByMe)
+            {
+                <span class="sr-only">· liked by you</span>
+            }
+        </span>
+        <span class="inline-flex items-center gap-1.5">
+            <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+                <path fill-rule="evenodd" d="M10 3c-4.31 0-8 3.033-8 7 0 2.024.978 3.825 2.499 5.085a3.478 3.478 0 01-.522 1.756.75.75 0 00.584 1.143 5.976 5.976 0 003.936-1.108c.487.082.99.124 1.503.124 4.31 0 8-3.033 8-7s-3.69-7-8-7z" clip-rule="evenodd" />
+            </svg>
+            @Model.CommentCount @(Model.CommentCount == 1 ? "comment" : "comments")
+        </span>
+    </footer>
+</article>

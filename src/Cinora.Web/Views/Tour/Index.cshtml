@@ -1,0 +1,95 @@
+@{
+    ViewData["Title"] = "Explore Cinora";
+    // Brand-only top bar for this focused, immersive walkthrough (handled in _Layout).
+    ViewData["MinimalNav"] = true;
+    const string slide = "flex h-full w-full flex-none flex-col items-center justify-center gap-5 p-8 text-center sm:p-12";
+    const string iconWrap = "flex size-16 items-center justify-center rounded-2xl border border-white/10 bg-accent/10 text-accent";
+}
+
+@* Fullscreen feature slideshow. All interactivity is the CSP-safe `tour` Alpine component (bare-name bindings
+   only); arrow keys, swipe, dots, and the prev/next buttons drive a CSS transform on the track. *@
+<section x-data="tour" x-on:keydown.window="onKeydown"
+         class="mx-auto flex min-h-[calc(100dvh-9rem)] w-full max-w-4xl flex-col px-4 py-8 sm:py-12">
+    <div class="relative flex-1 overflow-hidden rounded-2xl border border-white/10 bg-surface-1/40 backdrop-blur-glass"
+         x-on:touchstart="onTouchStart" x-on:touchend="onTouchEnd">
+        <div x-ref="track" class="flex h-full transition-transform duration-500 ease-out motion-reduce:transition-none">
+            @* 1 — Discover *@
+            <article class="@slide">
+                <span class="@iconWrap" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="size-8" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4" />
+                    </svg>
+                </span>
+                <h2 class="font-display text-3xl text-ink">Discover what to watch</h2>
+                <p class="max-w-md text-ink-muted">Trending, popular, and top-rated rails for movies and series, rich title pages, and instant search — sourced live and always fresh.</p>
+            </article>
+
+            @* 2 — Rate & review *@
+            <article class="@slide">
+                <span class="@iconWrap" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="currentColor" class="size-8" aria-hidden="true">
+                        <path d="M12 2.5l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.9l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95L12 2.5z" />
+                    </svg>
+                </span>
+                <h2 class="font-display text-3xl text-ink">Rate what you watch</h2>
+                <p class="max-w-md text-ink-muted">Write reviews and score every title. Like and comment on what your friends post — every take, in one place.</p>
+            </article>
+
+            @* 3 — Friends & feed *@
+            <article class="@slide">
+                <span class="@iconWrap" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="size-8" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="9" cy="8" r="3" /><path d="M3.5 20a5.5 5.5 0 0 1 11 0" /><path d="M16 5.5a3 3 0 0 1 0 5.8M17.5 20a5.5 5.5 0 0 0-3-4.9" />
+                    </svg>
+                </span>
+                <h2 class="font-display text-3xl text-ink">Follow your friends</h2>
+                <p class="max-w-md text-ink-muted">Add friends and watch a live activity feed of their reviews, ratings, and watchlist moves — with realtime notifications.</p>
+            </article>
+
+            @* 4 — Watchlists & AI *@
+            <article class="@slide">
+                <span class="@iconWrap" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="size-8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" /><path d="M9.5 9.5l1.7 1.7 3.3-3.4" />
+                    </svg>
+                </span>
+                <h2 class="font-display text-3xl text-ink">Watchlists &amp; For-You picks</h2>
+                <p class="max-w-md text-ink-muted">Save titles to your watchlist from anywhere, and get a personalised “For You” rail of recommendations tuned to your taste.</p>
+            </article>
+
+            @* 5 — Call to action *@
+            <article class="@slide">
+                <span class="@iconWrap" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="currentColor" class="size-8" aria-hidden="true">
+                        <path d="M12 2l1.6 4.9L18.5 8l-4.9 1.6L12 14.5l-1.6-4.9L5.5 8l4.9-1.1L12 2z" /><path d="M18.5 13l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9.9-2.6z" />
+                    </svg>
+                </span>
+                <h2 class="font-display text-3xl text-ink">Ready to dive in?</h2>
+                <p class="max-w-md text-ink-muted">Create a free account to start rating, or jump straight into browsing.</p>
+                <div class="mt-2 flex flex-col gap-3 sm:flex-row">
+                    <a asp-controller="Account" asp-action="Register" class="btn btn-primary w-full sm:w-auto">Get started</a>
+                    <a asp-controller="Discovery" asp-action="Index" class="btn btn-ghost w-full sm:w-auto">Browse now</a>
+                </div>
+            </article>
+        </div>
+    </div>
+
+    @* Controls: back / dots / next. The tour component enables/disables the arrows and reflects the active dot. *@
+    <div class="mt-6 flex items-center justify-between gap-4">
+        <button type="button" x-ref="prev" x-on:click="prev"
+                class="btn btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-40">Back</button>
+        <div x-ref="dots" class="flex items-center gap-2" aria-label="Slides">
+            @for (var i = 0; i < 5; i++)
+            {
+                <button type="button" data-dot aria-label="Go to slide @(i + 1)"
+                        class="size-2.5 rounded-full bg-white/25 transition-colors hover:bg-white/40"></button>
+            }
+        </div>
+        <button type="button" x-ref="next" x-on:click="next"
+                class="btn btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+    </div>
+
+    <div class="mt-4 text-center">
+        <a asp-controller="Discovery" asp-action="Index" class="link text-sm text-ink-subtle">Skip the tour</a>
+    </div>
+</section>

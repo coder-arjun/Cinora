@@ -1,0 +1,82 @@
+@using Cinora.Application.Common.Interfaces
+@using Cinora.Infrastructure.Options
+@using Cinora.Web.ViewModels.Common
+@using Microsoft.Extensions.Options
+@model AvatarViewModel
+@inject IFileStorage FileStorage
+@inject IOptions<FileStorageOptions> FileStorageOptions
+
+@*
+    Milestone 4.2 — the shared _Avatar seam (§3, §11). It renders a real avatar <img> served through the
+    same-origin, time-limited token URL (IFileStorage.GetUrl — a pure, I/O-free call, safe in a view) when the
+    user has an AvatarFileKey, or the monogram fallback when the key is null. Reused everywhere a user appears;
+    a caller supplies only (DisplayName, AvatarFileKey[, Size]).
+
+    CRITICAL (architecture L3 + security 4.2): GetUrl THROWS on a null/invalid key, so the seam calls it ONLY for
+    a non-null key and, defensively, catches a bad key so a corrupt AvatarFileKey degrades to the monogram —
+    never a 500 during render. The URL is bucketed (SignedUrlBucketHours) so it stays stable/cacheable within the
+    bucket. Same-origin ⇒ img-src 'self' already covers it (NO CSP widening).
+
+    A11Y (Milestone 4.2 Step C): Model.Decorative controls whether the name is announced. Where a VISIBLE adjacent
+    name already conveys the user (every card / the profile header / the notification message), the caller passes
+    Decorative:true so the image is decorative (alt="") / the monogram is aria-hidden — the SR reads the name once,
+    not twice. Where the avatar stands alone (the nav chip), Decorative stays false so BOTH the real-image alt AND
+    the monogram (role="img" + aria-label) carry a meaningful name — a labelled monogram was previously impossible
+    (it was hard-coded aria-hidden), so a standalone monogram nav chip is now announced.
+*@
+@{
+    // Rune-aware first character: DisplayName[..1] slices one UTF-16 code unit, which would split a
+    // surrogate pair (emoji / astral glyph) into a broken half-glyph. EnumerateRunes yields whole
+    // Unicode scalar values, so the leading rune renders intact. Guard empty/whitespace names.
+    var initial = "?";
+    if (!string.IsNullOrWhiteSpace(Model.DisplayName))
+    {
+        var runes = Model.DisplayName.EnumerateRunes();
+        if (runes.MoveNext())
+        {
+            initial = runes.Current.ToString().ToUpperInvariant();
+        }
+    }
+
+    string? avatarUrl = null;
+    if (!string.IsNullOrEmpty(Model.AvatarFileKey))
+    {
+        try
+        {
+            var ttl = TimeSpan.FromHours(FileStorageOptions.Value.SignedUrlBucketHours);
+            avatarUrl = FileStorage.GetUrl(Model.AvatarFileKey, ttl);
+        }
+        catch (ArgumentException)
+        {
+            // A corrupt/invalid key must never 500 a render — fall through to the monogram.
+            avatarUrl = null;
+        }
+    }
+
+    var sizeClasses = Model.Size switch
+    {
+        AvatarSize.Small => "h-9 w-9 text-sm",
+        AvatarSize.Large => "h-24 w-24 text-3xl",
+        _ => "h-12 w-12 text-base",
+    };
+    var frameClasses = $"{sizeClasses} shrink-0 rounded-pill border border-white/10 bg-surface-2/70";
+}
+@if (avatarUrl is not null)
+{
+    @* Milestone 6.4 (§6.5): above-the-fold placements (nav chip, profile/settings header) pass Eager:true so the
+       image is not deferred; everything below the fold stays lazy. The box is reserved either way → no CLS. *@
+    <img src="@avatarUrl" alt="@(Model.Decorative ? string.Empty : Model.DisplayName)"
+         loading="@(Model.Eager ? "eager" : "lazy")" decoding="async"
+         class="@frameClasses object-cover" />
+}
+else if (Model.Decorative)
+{
+    @* Decorative — an adjacent visible name already conveys the user; keep the monogram out of the a11y tree. *@
+    <span class="@frameClasses flex items-center justify-center font-semibold text-ink" aria-hidden="true">@initial</span>
+}
+else
+{
+    @* Standalone (e.g. the nav chip) — the monogram is the ONLY identifier, so give it a meaningful accessible name. *@
+    <span class="@frameClasses flex items-center justify-center font-semibold text-ink"
+          role="img" aria-label="@Model.DisplayName">@initial</span>
+}

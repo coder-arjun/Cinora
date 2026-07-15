@@ -1,0 +1,88 @@
+@using Cinora.Web.ViewModels.Common
+@model Cinora.Web.ViewModels.Chat.SharePickerVm
+@{
+    ViewData["Title"] = "Share";
+    var mediaLabel = string.Equals(Model.MediaType, "Series", StringComparison.OrdinalIgnoreCase) ? "Series" : "Movie";
+}
+@*
+    Movie sharing (§3) — the destination picker. Shows the title being shared and lets the user send it to a
+    friend (opens/creates a DM) or a group. Each destination is an anti-forgery-protected form (tag helper injects
+    the token); submitting shares the card and lands the user in that thread. No inline JS — CSP untouched.
+*@
+<section class="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
+    <div class="animate-rise-in">
+        <p class="text-xs font-semibold uppercase tracking-widest text-accent">Share to chat</p>
+        <h1 class="mt-2 font-display text-3xl text-ink">Send to a friend</h1>
+    </div>
+
+    @* The title being shared *@
+    <div class="card-glass mt-6 flex items-center gap-4 p-4">
+        <img asp-tmdb-poster="@Model.PosterPath" asp-tmdb-size="W185" alt="@Model.Title"
+             class="h-24 w-16 shrink-0 rounded-card object-cover" />
+        <div class="min-w-0">
+            <span class="inline-flex items-center gap-1 text-[0.62rem] font-semibold uppercase tracking-wide text-accent">🎬 @mediaLabel</span>
+            <p class="mt-1 font-display text-lg text-ink">@Model.Title</p>
+        </div>
+    </div>
+
+    @if (Model.Friends.Count == 0 && Model.Groups.Count == 0)
+    {
+        <div class="card-glass mt-6 px-6 py-8 text-center">
+            <p class="text-sm text-ink-muted">
+                You have no friends or groups to share with yet.
+                <a class="link" asp-controller="Friends" asp-action="Index">Find friends</a> to start sharing.
+            </p>
+        </div>
+    }
+
+    @if (Model.Friends.Count > 0)
+    {
+        <div class="mt-8">
+            <h2 class="font-display text-lg text-ink">Friends</h2>
+            <div class="mt-3 space-y-2">
+                @foreach (var friend in Model.Friends)
+                {
+                    <form asp-controller="Chat" asp-action="ShareMovieToFriend" method="post">
+                        <input type="hidden" name="OtherUserId" value="@friend.UserId" />
+                        <input type="hidden" name="TmdbId" value="@Model.TmdbId" />
+                        <input type="hidden" name="MediaType" value="@Model.MediaType" />
+                        <input type="hidden" name="Title" value="@Model.Title" />
+                        <input type="hidden" name="PosterPath" value="@Model.PosterPath" />
+                        <button type="submit"
+                                class="flex w-full items-center gap-3 rounded-card border border-white/5 bg-surface-1/40 px-4 py-3 text-left transition-colors hover:border-accent/40 hover:bg-surface-1/70">
+                            <partial name="_Avatar" model="new AvatarViewModel(friend.DisplayName, friend.AvatarFileKey, AvatarSize.Medium, Decorative: true)" />
+                            <span class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">@friend.DisplayName</span>
+                            <span class="shrink-0 text-xs font-medium text-accent">Send</span>
+                        </button>
+                    </form>
+                }
+            </div>
+        </div>
+    }
+
+    @if (Model.Groups.Count > 0)
+    {
+        <div class="mt-8">
+            <h2 class="font-display text-lg text-ink">Groups</h2>
+            <div class="mt-3 space-y-2">
+                @foreach (var group in Model.Groups)
+                {
+                    <form asp-controller="Chat" asp-action="ShareMovieToConversation" asp-route-id="@group.Id" method="post">
+                        <input type="hidden" name="TmdbId" value="@Model.TmdbId" />
+                        <input type="hidden" name="MediaType" value="@Model.MediaType" />
+                        <input type="hidden" name="Title" value="@Model.Title" />
+                        <input type="hidden" name="PosterPath" value="@Model.PosterPath" />
+                        <button type="submit"
+                                class="flex w-full items-center gap-3 rounded-card border border-white/5 bg-surface-1/40 px-4 py-3 text-left transition-colors hover:border-accent/40 hover:bg-surface-1/70">
+                            <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-pill border border-white/10 bg-surface-2/70 text-ink-subtle" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="h-5 w-5"><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19a5.5 5.5 0 0 1 11 0" /><path d="M16 5.4a3 3 0 0 1 0 5.9" /><path d="M17.8 19a5.5 5.5 0 0 0-3-4.9" /></svg>
+                            </span>
+                            <span class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">@group.Title</span>
+                            <span class="shrink-0 text-xs font-medium text-accent">Send</span>
+                        </button>
+                    </form>
+                }
+            </div>
+        </div>
+    }
+</section>

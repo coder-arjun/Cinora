@@ -1,0 +1,85 @@
+@using Cinora.Application.Features.Friends
+@using Cinora.Web.ViewModels.Common
+@model Cinora.Web.ViewModels.Chat.ChatThreadVm
+@{
+    var header = Model.Header;
+    var memberIds = header.Members.Select(m => m.UserId).ToHashSet();
+    var friends = (ViewData["ChatFriends"] as IReadOnlyList<FriendVm>) ?? [];
+    var addable = friends.Where(f => !memberIds.Contains(f.UserId)).ToList();
+}
+@*
+    §6 — the collapsible group-management panel (hidden by default; chat.ts toggles it via
+    data-chat-action="toggle-group-panel"). Admins can rename, add friends, and remove members; anyone can leave.
+    Every action is a plain anti-forgery-protected form (the tag helper injects the token); destructive ones carry
+    data-confirm-* so site.ts shows the styled confirm.
+*@
+<div id="group-panel" class="hidden border-b border-white/10 bg-surface-1/40 px-4 py-4">
+    <div class="space-y-4">
+        @if (header.IsAdmin)
+        {
+            @* Rename *@
+            <form asp-controller="Chat" asp-action="Rename" asp-route-id="@header.Id" method="post" class="flex items-end gap-2">
+                <div class="flex-1">
+                    <label for="group-rename" class="text-xs font-semibold uppercase tracking-wide text-ink-subtle">Group name</label>
+                    <input id="group-rename" name="Title" value="@header.Title" maxlength="80" required
+                           class="mt-1 w-full rounded-btn border border-white/10 bg-surface-2/60 px-3 py-2 text-sm text-ink focus:border-accent/40 focus:outline-none" />
+                </div>
+                <button type="submit" class="btn btn-secondary text-sm">Rename</button>
+            </form>
+        }
+
+        @* Roster *@
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-ink-subtle">Members</p>
+            <ul class="mt-2 space-y-1.5">
+                @foreach (var member in header.Members)
+                {
+                    <li class="flex items-center gap-2.5">
+                        <partial name="_Avatar" model="new AvatarViewModel(member.DisplayName, member.AvatarFileKey, AvatarSize.Small, Decorative: true)" />
+                        <span class="min-w-0 flex-1 truncate text-sm text-ink">@member.DisplayName</span>
+                        @if (member.IsAdmin)
+                        {
+                            <span class="rounded-pill bg-accent/15 px-2 py-0.5 text-[0.62rem] font-semibold text-accent">Admin</span>
+                        }
+                        @if (header.IsAdmin && !member.IsAdmin)
+                        {
+                            <form asp-controller="Chat" asp-action="RemoveMember" asp-route-id="@header.Id" asp-route-userId="@member.UserId" method="post">
+                                <button type="submit" class="rounded-btn px-2 py-1 text-xs text-danger/90 transition-colors hover:bg-danger/10 hover:text-danger"
+                                        data-confirm-title="Remove member?"
+                                        data-confirm-message="Remove @member.DisplayName from this group?"
+                                        data-confirm-action="Remove" data-confirm-tone="danger">Remove</button>
+                            </form>
+                        }
+                    </li>
+                }
+            </ul>
+        </div>
+
+        @if (header.IsAdmin && addable.Count > 0)
+        {
+            @* Add members from friends not already in the group. *@
+            <form asp-controller="Chat" asp-action="AddMembers" asp-route-id="@header.Id" method="post">
+                <p class="text-xs font-semibold uppercase tracking-wide text-ink-subtle">Add friends</p>
+                <div class="mt-2 max-h-40 space-y-1 overflow-y-auto">
+                    @foreach (var friend in addable)
+                    {
+                        <label class="flex items-center gap-2.5 rounded-btn px-2 py-1.5 hover:bg-white/5">
+                            <input type="checkbox" name="MemberIds" value="@friend.UserId" class="accent-accent" />
+                            <partial name="_Avatar" model="new AvatarViewModel(friend.DisplayName, friend.AvatarFileKey, AvatarSize.Small, Decorative: true)" />
+                            <span class="min-w-0 flex-1 truncate text-sm text-ink">@friend.DisplayName</span>
+                        </label>
+                    }
+                </div>
+                <button type="submit" class="btn btn-secondary mt-2 text-sm">Add selected</button>
+            </form>
+        }
+
+        @* Leave *@
+        <form asp-controller="Chat" asp-action="Leave" asp-route-id="@header.Id" method="post">
+            <button type="submit" class="w-full rounded-btn border border-danger/30 px-3 py-2 text-sm font-medium text-danger/90 transition-colors hover:bg-danger/10 hover:text-danger"
+                    data-confirm-title="Leave group?"
+                    data-confirm-message="You will stop receiving messages from this group."
+                    data-confirm-action="Leave" data-confirm-tone="danger">Leave group</button>
+        </form>
+    </div>
+</div>

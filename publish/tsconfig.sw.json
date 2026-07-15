@@ -1,0 +1,12 @@
+{
+  // Type-checking config for the service worker ONLY. The worker runs in a ServiceWorkerGlobalScope, not a
+  // DOM window, so it is checked against the "WebWorker" lib (ServiceWorkerGlobalScope, ExtendableEvent,
+  // FetchEvent, Clients…) instead of "DOM". It is excluded from the main tsconfig.json (which uses "DOM"),
+  // and `npm run typecheck` runs both. esbuild does the transpile/bundle (see build.mjs); this is `--noEmit`.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "WebWorker"]
+  },
+  "include": ["Scripts/sw.ts"],
+  "exclude": []
+}

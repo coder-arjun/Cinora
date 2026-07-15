@@ -1,0 +1,86 @@
+@model NotificationSettingsViewModel
+@{
+    ViewData["Title"] = "Notification settings";
+}
+
+@*
+    Milestone 6.3 (ADR 0020 §5.3) — the ONE canonical notification-settings surface. It replaces both the Phase-4
+    disabled "arriving with push" placeholder AND the 6.2 "Enable notifications" control that briefly lived on the
+    profile page: the device subscribe control and the per-type push toggles now live here together.
+
+    Copy is deliberate: IN-APP notifications ALWAYS arrive (the inbox is the source of truth); these toggles govern
+    only OUT-OF-APP push. Progressive enhancement: [data-push-enable] is server-rendered HIDDEN and revealed by
+    site.ts (wirePushSubscribe) only where the browser supports service workers + the Push API AND push is
+    configured server-side; on click it requests permission (never on load), subscribes, and POSTs to
+    /push/subscribe with the anti-forgery token — CSP-safe (bundled, no inline JS, same-origin fetch).
+
+    A11y: #settings-status (persistent polite node) and #settings-error (persistent role="alert") live OUTSIDE the
+    swap target (#notification-prefs-form) so they survive the toggle-form swap and reliably announce. site.ts (the
+    region-scoped settings pattern, extended for /settings/notifications) announces "Notification preferences
+    saved", restores focus when the Save button is swapped away, and surfaces a concise inline alert on a non-2xx
+    response. The push subscribe success/denied announces through the same #settings-status. No CSP widening:
+    same-origin HTMX POST (connect-src 'self'), browser-native push (not a page network request).
+*@
+<section class="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6 sm:py-14">
+    <header class="mb-8 animate-rise-in">
+        <h1 class="font-display text-3xl text-ink sm:text-4xl">Notifications</h1>
+        <p class="mt-2 text-sm text-ink-subtle">
+            In-app notifications always arrive in your inbox. These settings control push notifications &mdash; the
+            alerts your device shows even when Cinora isn't open.
+        </p>
+    </header>
+
+    @* Persistent polite node: site.ts copies a concise result here after a preferences swap AND on push subscribe. *@
+    <span id="settings-status" class="sr-only" role="status" aria-live="polite"></span>
+
+    @* The inline error surface. Hidden until site.ts fills it on a non-2xx HTMX response; role="alert" so it is
+       announced. Kept OUTSIDE the swap target so a swap never destroys it. *@
+    <div id="settings-error" role="alert"
+         class="mb-6 hidden rounded-btn border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-ink"></div>
+
+    <div class="card-glass p-6 sm:p-8">
+        <div class="min-w-0">
+            <h2 class="font-display text-xl text-ink">Push on this device</h2>
+            <p class="mt-1 text-sm text-ink-subtle">
+                Get notified on this device even when Cinora isn't open. You'll be asked once for permission.
+            </p>
+        </div>
+
+        @* Hidden by default; site.ts (wirePushSubscribe) unhides it only where Web Push is supported. *@
+        <div data-push-enable hidden class="mt-5 flex flex-col items-start gap-2">
+            <button type="button" data-push-enable-button class="btn btn-primary text-sm">
+                Enable push on this device
+            </button>
+            @* Shown by site.ts IN PLACE OF Enable when this device is already subscribed; unsubscribes the browser
+               PushSubscription and POSTs /push/unsubscribe (anti-forgery header, same-origin). Hidden by default. *@
+            <button type="button" data-push-disable-button hidden class="btn btn-ghost text-sm">
+                Turn off push on this device
+            </button>
+            <p class="text-xs text-ink-subtle">
+                You'll get a one-time browser prompt to allow notifications for this device.
+            </p>
+            @* Visible outcome line (FIX 6.3 H2 → 4.1.3): site.ts mirrors the subscribe result here via textContent
+               so a sighted user who denies/blocks push gets an on-screen cue + recovery guidance. aria-hidden — the
+               reliable SR announce rides the persistent polite #settings-status node (announceSettings). Empty +
+               hidden until a result; site.ts tints it text-danger on the blocked/error branch. *@
+            <p data-push-status hidden aria-hidden="true" class="text-xs text-ink-muted"></p>
+        </div>
+
+        @* Reassurance shown in all cases (FIX 6.3 L2): reworded so it no longer contradicts the revealed Enable
+           control on a supported browser — it now reads as a general statement true whether or not push is enabled. *@
+        <p class="mt-5 text-xs text-ink-subtle">
+            On unsupported browsers, your notifications still appear in your Cinora inbox.
+        </p>
+    </div>
+
+    <div class="card-glass mt-6 p-6 sm:p-8">
+        <h2 id="what-to-push-heading" class="font-display text-xl text-ink">What to push</h2>
+        <p class="mt-1 text-sm text-ink-subtle">
+            Choose which activity pushes to your devices. Turning one off never hides it from your in-app inbox.
+        </p>
+        @* tabindex="-1": site.ts restores focus here after the form self-swaps (the Save button is destroyed). *@
+        <div id="notification-prefs-form" tabindex="-1" class="mt-6 outline-none">
+            <partial name="_NotificationPreferencesForm" model="Model" />
+        </div>
+    </div>
+</section>

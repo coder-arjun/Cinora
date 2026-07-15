@@ -1,0 +1,57 @@
+@model WatchlistItemVm
+@{
+    var mediaSegment = Model.Media.ToString().ToLowerInvariant();
+    var detailsHref = $"/discover/title/{mediaSegment}/{Model.TmdbId}";
+
+    // One accessible name for the whole card link: title + year when present (mirrors _TitleCard; a watchlist
+    // entry carries no vote average, so — like a zero-rated title card — no rating is appended).
+    var accessibleName = Model.Title + (Model.ReleaseYear is { } y ? $" ({y})" : string.Empty);
+
+    // The page is [Authorize], so the viewer is always signed in and the status is already known — the reused
+    // control needs no extra query (§6.1). OnDetails=false → the Watched nudge links the title's Details reviews.
+    var control = new WatchlistControlVm(Model.TmdbId, Model.Media, Model.Status, IsAuthenticated: true)
+    {
+        OnDetails = false,
+    };
+}
+
+@*
+    Milestone 4.4 — one watchlist poster card, shared by the page shell (Index) and the load-more fragment
+    (_WatchlistPage) so the card markup lives once. It MIRRORS the discovery rails' _TitleCard grammar (the same
+    .poster-card / .poster-frame / .poster-img elevation — hover/focus lift, art zoom, glass frame; a fixed 2:3
+    frame reserves space so the lazy poster cannot shift layout, CLS-safe) — mirrored rather than reused because
+    _TitleCard lives under Views/Discovery and a partial referenced from a Watchlist view resolves only against
+    Views/Watchlist + Views/Shared. It then hangs the reusable _WatchlistControl over the poster as an
+    absolutely-positioned SIBLING, OUTSIDE the card's <a> (an interactive control cannot nest inside an anchor —
+    same discipline as _Rail / _SearchResults).
+
+    data-watchlist-card + data-watchlist-status let Scripts/site.ts (the 4.4 page block) act on an in-place
+    remove: a successful remove ON THIS PAGE returns the null-status "Add" control, which reads as confusing on a
+    "my watchlist" surface — so site.ts instead removes the whole <li>, decrements the matching filter-chip
+    count, moves focus, and re-evaluates the empty state. The card root is NOT swapped (only the control inside
+    it is), so data-watchlist-status survives the swap and tells site.ts which chip to decrement.
+*@
+<div class="relative" data-watchlist-card data-watchlist-status="@Model.Status">
+    <a href="@detailsHref" class="poster-card" aria-label="@accessibleName">
+        <div class="poster-frame aspect-[2/3]">
+            <img asp-tmdb-poster="@Model.PosterPath" asp-tmdb-size="W342" alt="@Model.Title"
+                 class="poster-img" />
+
+            @* Cinematic base vignette for depth — decorative only, in the page surface tone. *@
+            <div class="pointer-events-none absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-surface-0/60 to-transparent"
+                 aria-hidden="true"></div>
+        </div>
+
+        <div class="mt-3">
+            <h3 class="truncate text-sm font-medium text-ink" title="@Model.Title">@Model.Title</h3>
+            @if (Model.ReleaseYear is { } yr)
+            {
+                <p class="mt-0.5 text-xs text-ink-subtle">@yr</p>
+            }
+        </div>
+    </a>
+
+    <div class="absolute left-2 top-2 z-10">
+        <partial name="_WatchlistControl" model="control" />
+    </div>
+</div>

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Cinora.Application — depends only on Cinora.Domain (the ONLY allowed edge, §3). -->
+  <ItemGroup>
+    <ProjectReference Include="..\Cinora.Domain\Cinora.Domain.csproj" />
+  </ItemGroup>
+
+  <!--
+    Bounded NuGet exception (solution-structure.md §3 / ADR 0001): the EF Core ABSTRACTIONS
+    package only, so IAppDbContext can expose DbSet<T>. NOT the SQL Server provider.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+  </ItemGroup>
+
+  <!--
+    Milestone 1.4: FluentValidation (Apache-2.0) for command/query validators, plus the DI extension
+    for AddValidatorsFromAssembly. Consumed by AddApplication() and the hand-rolled ValidationBehavior.
+    NO MediatR — the mediator (ISender/IRequest/IPipelineBehavior) is hand-rolled in Common/Messaging.
+  -->
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+  </ItemGroup>
+
+</Project>

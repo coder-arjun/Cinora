@@ -1,0 +1,12 @@
+@{
+    ViewData["Title"] = "Access denied";
+}
+
+<section class="mx-auto flex w-full max-w-md flex-col px-4 py-24">
+    <div class="card-glass animate-rise-in w-full p-8 text-center">
+        <p class="text-xs font-semibold uppercase tracking-widest text-accent">403</p>
+        <h1 class="mt-2 font-display text-3xl text-ink">Access denied</h1>
+        <p class="mt-3 text-ink-muted">You don't have permission to view this resource.</p>
+        <a asp-controller="Home" asp-action="Index" class="btn btn-primary mt-8">Return home</a>
+    </div>
+</section>

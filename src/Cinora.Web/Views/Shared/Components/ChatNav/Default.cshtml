@@ -1,0 +1,19 @@
+@model int
+@*
+    §9 — the nav chat entry + unread badge (authenticated users only; invoked from _Layout inside the authed
+    branch). Links to the /chat two-pane surface. The badge id "chat-unread-badge" seeds the server-rendered
+    count (accurate on navigation). Attribute-only markup — no inline JS, so the strict CSP is untouched.
+*@
+<a asp-controller="Chat" asp-action="Index"
+   id="chat-nav"
+   class="relative inline-flex items-center justify-center rounded-btn px-3 py-2 text-ink-muted transition-colors hover:bg-white/5 hover:text-ink"
+   aria-label="@(Model > 0 ? $"Messages, {Model} unread" : "Messages")">
+    <svg viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5" aria-hidden="true">
+        <path fill-rule="evenodd" d="M10 3c-4.418 0-8 2.91-8 6.5 0 1.86.96 3.53 2.5 4.7V18l3.06-1.7c.78.13 1.6.2 2.44.2 4.418 0 8-2.91 8-6.5S14.418 3 10 3z" clip-rule="evenodd" />
+    </svg>
+    <span id="chat-unread-badge"
+          data-unread-count="@Model"
+          class="pointer-events-none absolute -right-0.5 -top-0.5 inline-flex min-w-[1.15rem] items-center justify-center rounded-pill bg-accent px-1 text-[0.65rem] font-semibold leading-tight text-on-accent @(Model > 0 ? null : "hidden")">
+        @(Model > 9 ? "9+" : Model.ToString(System.Globalization.CultureInfo.InvariantCulture))
+    </span>
+</a>

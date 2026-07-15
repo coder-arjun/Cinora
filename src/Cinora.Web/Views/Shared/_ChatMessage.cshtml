@@ -1,0 +1,87 @@
+@using Cinora.Web.ViewModels.Common
+@model Cinora.Application.Features.Chat.ChatMessageVm
+@{
+    var mediaToken = (Model.SharedMovieMediaType ?? "Movie").ToLowerInvariant();
+    var mediaLabel = string.Equals(Model.SharedMovieMediaType, "Series", StringComparison.OrdinalIgnoreCase) ? "Series" : "Movie";
+    var isShare = Model.SharedMovieTmdbId is > 0 && !Model.IsDeleted;
+}
+@*
+    §6/§13 — one chat message bubble. Body is PLAIN TEXT: rendered with Razor's default @-encoding (never
+    Html.Raw); the realtime client appends via textContent. data-message-id is the client-side dedupe key against
+    the SignalR echo. Mine → right (accent); theirs → left with the sender avatar. A soft-deleted message renders
+    a muted tombstone. A shared movie renders a poster card linking to the title (with an optional caption bubble).
+*@
+<div id="msg-@Model.Id" data-message-id="@Model.Id" data-mine="@(Model.IsMine ? "true" : "false")"
+     class="flex items-end gap-2 @(Model.IsMine ? "flex-row-reverse" : "flex-row")">
+    @if (!Model.IsMine)
+    {
+        <partial name="_Avatar" model="new AvatarViewModel(Model.SenderDisplayName, Model.SenderAvatarFileKey, AvatarSize.Small, Decorative: true)" />
+    }
+    <div class="group flex max-w-[78%] flex-col @(Model.IsMine ? "items-end" : "items-start")">
+        @if (!Model.IsMine)
+        {
+            <span class="mb-0.5 px-1 text-[0.7rem] font-medium text-ink-subtle">@Model.SenderDisplayName</span>
+        }
+
+        @if (Model.IsDeleted)
+        {
+            <div class="rounded-2xl bg-surface-2 px-3.5 py-2 text-sm italic leading-relaxed text-ink opacity-70">Message deleted</div>
+        }
+        else
+        {
+            @if (isShare)
+            {
+                <a asp-controller="Discovery" asp-action="Details" asp-route-media="@mediaToken" asp-route-tmdbId="@Model.SharedMovieTmdbId"
+                   class="flex w-64 max-w-full items-stretch gap-3 overflow-hidden rounded-2xl border border-white/10 bg-surface-2/80 transition-colors hover:border-accent/40 @(Model.IsMine ? "rounded-br-sm" : "rounded-bl-sm")">
+                    <img asp-tmdb-poster="@Model.SharedMoviePosterPath" asp-tmdb-size="W185" alt="@Model.SharedMovieTitle"
+                         class="h-24 w-16 shrink-0 object-cover" />
+                    <span class="flex min-w-0 flex-col justify-center py-2 pr-3">
+                        <span class="inline-flex items-center gap-1 text-[0.62rem] font-semibold uppercase tracking-wide text-accent">🎬 @mediaLabel</span>
+                        <span class="mt-0.5 line-clamp-3 text-sm font-semibold text-ink">@Model.SharedMovieTitle</span>
+                        <span class="mt-1 text-[0.62rem] text-ink-subtle">Tap to view details</span>
+                    </span>
+                </a>
+            }
+
+            @if (!string.IsNullOrEmpty(Model.Body))
+            {
+                <div class="mt-1 rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-sm @(Model.IsMine ? "rounded-br-sm bg-accent text-on-accent" : "rounded-bl-sm bg-surface-2 text-ink")">
+                    <span class="whitespace-pre-wrap break-words">@Model.Body</span>
+                </div>
+            }
+        }
+
+        <div class="mt-0.5 flex items-center gap-1.5 px-1 @(Model.IsMine ? "flex-row-reverse" : "flex-row")">
+            @* datetime carries an explicit UTC 'Z' so the client localizes it correctly (EF loads datetime2 as
+               Unspecified, so an "o" round-trip would omit the zone and be mis-parsed as local). *@
+            <time datetime="@(Model.SentAtUtc.ToString("s"))Z" data-chat-time
+                  class="text-[0.62rem] text-ink-subtle">@Model.SentAtUtc.ToString("HH:mm")</time>
+            @if (Model.IsMine && !Model.IsDeleted)
+            {
+                @* Delivery/read ticks (WhatsApp-style): ✓ sent, ✓✓ delivered (grey), ✓✓ read (blue). The client
+                   upgrades the state live on MessageDelivered / ConversationRead. *@
+                <span data-tick data-tick-state="@(Model.IsReadByOthers ? "read" : "sent")"
+                      class="chat-tick text-[0.72rem] leading-none tracking-[-0.18em] @(Model.IsReadByOthers ? "text-sky-400" : "text-ink-subtle")"
+                      title="@(Model.IsReadByOthers ? "Read" : "Sent")" aria-hidden="true">@(Model.IsReadByOthers ? "✓✓" : "✓")</span>
+            }
+            @if (Model.IsMine && !Model.IsDeleted)
+            {
+                @* Sender-only delete — styled confirm (site.ts intercepts data-confirm-*), swaps the tombstone in place. *@
+                <button type="button"
+                        class="rounded-full p-0.5 text-ink-subtle opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                        aria-label="Delete message"
+                        hx-post="/chat/messages/@Model.Id/delete"
+                        hx-target="#msg-@Model.Id"
+                        hx-swap="outerHTML"
+                        data-confirm-title="Delete message?"
+                        data-confirm-message="This message will be replaced with a 'message deleted' note for everyone."
+                        data-confirm-action="Delete"
+                        data-confirm-tone="danger">
+                    <svg viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M8 3a1 1 0 00-1 1v1H4a1 1 0 000 2h12a1 1 0 100-2h-3V4a1 1 0 00-1-1H8zM6 8h8l-.7 8.1a1 1 0 01-1 .9H7.7a1 1 0 01-1-.9L6 8z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+            }
+        </div>
+    </div>
+</div>

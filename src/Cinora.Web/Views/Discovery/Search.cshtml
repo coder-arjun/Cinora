@@ -1,0 +1,79 @@
+@model SearchPageViewModel
+@{
+    ViewData["Title"] = "Search";
+}
+
+@*
+    Milestone 2.4 — the full Search page. The `search` Alpine component is registered by NAME under the
+    @alpinejs/csp (eval-free) build, so every x-* value is a BARE NAME only (x-data="search",
+    x-model="query", x-on:input.debounce.300ms="onInput", x-show="loading", x-bind:aria-busy="loading") —
+    no inline expressions (§11.2d). Progressive enhancement: the <form method="get"> is the no-JS / deep-link
+    baseline — pressing Enter reloads /discover/search?q=… and the server renders page 1 into #search-results.
+    With JS, the debounced onInput fires HTMX (window.htmx.ajax) to swap the results partial in place.
+    #search-results is nested INSIDE the x-data root so x-bind:aria-busy resolves; HTMX only swaps its
+    innerHTML, so the region element (and its Alpine binding) persists across swaps.
+*@
+<section class="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
+    <header class="animate-rise-in mb-8 max-w-2xl sm:mb-10">
+        <p class="inline-flex items-center gap-2 rounded-pill border border-white/10 bg-surface-1/60 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-accent backdrop-blur-glass">
+            Search
+        </p>
+        <h1 class="mt-5 font-display text-display font-semibold text-ink">Find a film</h1>
+        <p class="mt-4 text-lg text-ink-muted">
+            Search thousands of titles.
+        </p>
+    </header>
+
+    @* data-query seeds the Alpine component (init() reads $root.dataset.query) so a deep link / no-JS
+       Enter-reload keeps its term in the box — x-model then reflects it back rather than blanking it. *@
+    <div x-data="search" data-query="@Model.Query">
+        <form method="get" action="/discover/search" role="search" class="max-w-2xl">
+            @* Movie-only in Phase 2, but echo the media so a no-JS submit preserves the deep-linked scope. *@
+            <input type="hidden" name="media" value="@Model.Media" />
+            <label for="search-q" class="sr-only">Search movies</label>
+            <div class="relative">
+                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center ps-4 text-ink-subtle" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5">
+                        <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+                    </svg>
+                </span>
+
+                <input id="search-q" name="q" type="search" autocomplete="off" spellcheck="false"
+                       inputmode="search" placeholder="Search movies…" value="@Model.Query"
+                       x-model="query" x-on:input.debounce.300ms="onInput"
+                       class="input ps-11 pe-11" />
+
+                @* Spinner: bare property reference only. x-cloak keeps it hidden until Alpine boots (no
+                   inline style — the strict style-src 'self' CSP would block that). *@
+                <span x-show="loading" x-cloak role="status" aria-hidden="false"
+                      class="absolute inset-y-0 right-0 flex items-center pe-4">
+                    <span class="sr-only">Searching…</span>
+                    <svg class="h-5 w-5 animate-spin text-accent" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                </span>
+            </div>
+        </form>
+
+        @* Dedicated polite status node for CONCISE announcements. Kept OUT of #search-results (so region
+           swaps never destroy it) — the whole card grid is deliberately NOT a live region, which would make
+           a screen reader re-read every card on each keystroke/append. site.ts copies each partial's short
+           data-search-announce string here after an HTMX swap. *@
+        <span id="search-status" class="sr-only" role="status" aria-live="polite"></span>
+
+        @* tabindex="-1" makes the region programmatically focusable so site.ts can restore focus here after a
+           swap that destroyed the focused control (e.g. Retry). role="region" is announced on that focus. *@
+        <div id="search-results" data-media="@Model.Media" role="region" aria-label="Search results"
+             tabindex="-1" x-bind:aria-busy="loading" class="mt-8 sm:mt-10">
+            @if (Model.Results is not null)
+            {
+                <partial name="_SearchResults" model="new SearchResultsViewModel(Model.Results, Model.Statuses, Model.IsAuthenticated)" />
+            }
+            else
+            {
+                <partial name="_SearchPrompt" model="new SearchPromptViewModel(Model.Media)" />
+            }
+        </div>
+    </div>
+</section>

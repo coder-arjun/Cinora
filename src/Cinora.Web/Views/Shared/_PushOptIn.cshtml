@@ -1,0 +1,25 @@
+@* Dismissible "turn on notifications" bar (mobile push discoverability, DailyPilot parity). Rendered in _Layout
+   for authenticated users when Web Push is configured. Hidden by default; Scripts/site.ts (wirePushOptIn) reveals
+   it only when push is SUPPORTED and permission is still "default" and it wasn't dismissed this session — or, on
+   iOS-not-installed, swaps to an "Add to Home Screen" hint. All wiring is data-attribute driven (CSP-safe; no
+   inline JS). The status line is aria-live so outcomes are announced. *@
+<div data-push-optin hidden
+     class="mx-auto mt-3 flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-btn border border-white/10 bg-surface-1/60 px-4 py-2.5 text-sm backdrop-blur-glass sm:px-6">
+    <div class="min-w-0 flex-1">
+        <p class="text-ink-muted">
+            <span data-push-optin-prompt>Turn on notifications to keep up with likes, comments, and friend activity.</span>
+            <span data-push-ios-hint hidden>To get notifications on iPhone, add Cinora to your Home Screen first (Share → Add to Home Screen), then open it from there.</span>
+        </p>
+        <span data-push-optin-status role="status" aria-live="polite" class="text-xs text-ink-subtle"></span>
+    </div>
+    <div class="flex shrink-0 items-center gap-2">
+        <button type="button" data-push-optin-enable class="btn btn-primary text-sm">Enable</button>
+        <button type="button" data-push-optin-test class="btn btn-ghost text-sm">Send test</button>
+        <button type="button" data-push-optin-dismiss aria-label="Dismiss"
+                class="rounded-btn p-2 text-ink-subtle transition-colors hover:bg-white/5 hover:text-ink">
+            <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+                <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+            </svg>
+        </button>
+    </div>
+</div>

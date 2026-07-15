@@ -1,0 +1,31 @@
+@using Cinora.Application.Features.Blocks
+@model BlockedUserVm
+@{
+    var cardId = $"blocked-{Model.UserId}";
+}
+
+@*
+    Milestone B1.5 — one row on the Blocked tab (GetBlockedUsersQuery): avatar + name + Unblock. Mirrors
+    _FriendCard's grammar exactly (card-glass-free flat row, same avatar seam, same button shell) so a blocked
+    user reads as a first-class part of the same list system, not a bolted-on variant. DisplayName is user
+    content — always Razor output-encoded (@), never Html.Raw. The DELETE returns an empty 200 so HTMX removes
+    this node; no confirm gate here (unblocking is reversible — a fresh block is one tap away on their profile).
+*@
+<article id="@cardId" data-blocked-card class="flex items-center gap-3 rounded-card border border-white/5 bg-surface-1/40 px-4 py-3">
+    @* Decorative: the name beside it already names the user (no double SR announcement) — same convention as
+       _FriendCard's avatar. *@
+    <partial name="_Avatar" model="new AvatarViewModel(Model.DisplayName, Model.AvatarFileKey, AvatarSize.Medium, Decorative: true)" />
+
+    <div class="min-w-0 flex-1">
+        <span class="block truncate text-sm font-semibold text-ink" title="@Model.DisplayName">@Model.DisplayName</span>
+        <span class="text-xs text-ink-subtle">Blocked</span>
+    </div>
+
+    <button type="button"
+            class="inline-flex min-h-9 shrink-0 items-center rounded-btn px-3 py-1.5 text-sm font-medium text-ink-muted transition-colors hover:bg-white/5 hover:text-ink"
+            hx-delete="/friends/@Model.UserId/block"
+            hx-target="#@cardId"
+            hx-swap="outerHTML">
+        Unblock
+    </button>
+</article>

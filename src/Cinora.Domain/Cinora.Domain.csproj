@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Cinora.Domain — innermost Clean Architecture layer.
+    References NOTHING (no project references, ideally zero NuGet packages).
+    All shared build settings come from ../Directory.Build.props (+ repo-root Directory.Build.props).
+  -->
+
+</Project>

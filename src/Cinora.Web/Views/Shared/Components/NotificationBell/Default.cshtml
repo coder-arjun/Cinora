@@ -1,0 +1,16 @@
+@model int
+@*
+    Milestone 3.5 — the nav notification bell + live unread badge (authenticated users only; invoked from
+    _Layout inside the authed branch). Links to the full /notifications inbox. The badge is the shared
+    _UnreadBadge partial (stable id the frontend updates live). Attribute-only markup — no inline JS, so the
+    strict script-src 'self' CSP is untouched.
+*@
+<a asp-controller="Notifications" asp-action="Index"
+   id="notification-bell"
+   class="relative inline-flex items-center justify-center rounded-btn px-3 py-2 text-ink-muted transition-colors hover:bg-white/5 hover:text-ink"
+   aria-label="@(Model > 0 ? $"Notifications, {Model} unread" : "Notifications")">
+    <svg viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5" aria-hidden="true">
+        <path d="M10 2a6 6 0 00-6 6v2.586l-.707.707A1 1 0 004 13h12a1 1 0 00.707-1.707L16 10.586V8a6 6 0 00-6-6zM8.293 16a2 2 0 003.414 0H8.293z" />
+    </svg>
+    <partial name="_UnreadBadge" model="Model" />
+</a>

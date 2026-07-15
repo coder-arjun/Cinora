@@ -1,0 +1,39 @@
+@using Cinora.Web.ViewModels.Common
+@using Cinora.Domain.Enums
+@model Cinora.Application.Features.Chat.ConversationSummaryVm
+@{
+    var isActive = string.Equals(ViewContext.RouteData.Values["id"]?.ToString(), Model.Id.ToString(), StringComparison.OrdinalIgnoreCase);
+}
+@*
+    §6 — one conversation list row: avatar (the other member's for a DM, a group monogram for a group), title,
+    last-message preview, and unread badge. A plain anchor to /chat/{id} (full navigation — reliable, and the
+    realtime client re-connects per page like notifications). Names/previews are Razor @-encoded.
+*@
+<a asp-controller="Chat" asp-action="Thread" asp-route-id="@Model.Id" data-conversation-id="@Model.Id"
+   class="flex items-center gap-3 rounded-card border px-3 py-2.5 transition-colors @(isActive ? "border-accent/40 bg-accent/10" : "border-white/5 bg-surface-1/40 hover:border-white/10 hover:bg-surface-1/70")">
+    @if (Model.Type == ConversationType.Group)
+    {
+        <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-pill border border-white/10 bg-surface-2/70 text-ink-subtle" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="h-5 w-5">
+                <circle cx="9" cy="8" r="3.2" /><path d="M3.5 19a5.5 5.5 0 0 1 11 0" /><path d="M16 5.4a3 3 0 0 1 0 5.9" /><path d="M17.8 19a5.5 5.5 0 0 0-3-4.9" />
+            </svg>
+        </span>
+    }
+    else
+    {
+        <partial name="_Avatar" model="new AvatarViewModel(Model.Title, Model.AvatarFileKey, AvatarSize.Medium, Decorative: true)" />
+    }
+    <div class="min-w-0 flex-1">
+        <div class="flex items-center justify-between gap-2">
+            <span class="truncate text-sm font-semibold text-ink">@Model.Title</span>
+            <span class="shrink-0 text-[0.62rem] text-ink-subtle" data-chat-time data-datetime="@(Model.LastMessageAtUtc.ToString("s"))Z">@Model.LastMessageAtUtc.ToString("HH:mm")</span>
+        </div>
+        <div class="mt-0.5 flex items-center justify-between gap-2">
+            <span class="truncate text-xs text-ink-subtle">@(Model.LastMessagePreview ?? "No messages yet")</span>
+            @if (Model.UnreadCount > 0)
+            {
+                <span class="inline-flex min-w-[1.15rem] shrink-0 items-center justify-center rounded-pill bg-accent px-1 text-[0.62rem] font-semibold leading-tight text-on-accent">@(Model.UnreadCount > 9 ? "9+" : Model.UnreadCount.ToString(System.Globalization.CultureInfo.InvariantCulture))</span>
+            }
+        </div>
+    </div>
+</a>

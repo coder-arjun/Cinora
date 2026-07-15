@@ -1,0 +1,174 @@
+<Project>
+
+  <!--
+    Central Package Management (solution-structure.md §2/§4). Every NuGet version is pinned
+    here exactly once; project .csproj files reference packages by name only (no Version=).
+
+    Milestone 1.0 scope: ONLY test-infrastructure packages. Application/runtime packages
+    (MediatR, FluentValidation, EF Core, Serilog, ASP.NET Identity, Google auth, etc.) are
+    intentionally absent — they arrive with their own milestones (1.1-1.6). FluentAssertions
+    is deliberately excluded (banned under the free-only constraint / licensing); tests use
+    the built-in xUnit Assert.
+  -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+  </ItemGroup>
+
+  <!--
+    Milestone 1.2 — EF Core / SQL Server persistence layer. Pinned to the 10.0.x line to match the
+    installed dotnet-ef tool (10.0.8) and the ASP.NET Core 10 runtime. All free Microsoft packages.
+    - Microsoft.EntityFrameworkCore is the ABSTRACTIONS package (Application references it only for
+      IAppDbContext's DbSet<T> — the bounded exception in solution-structure.md §3).
+    - The SqlServer provider, Design (design-time services), and Identity EF stores are Infrastructure.
+    - The Design package is ALSO referenced by the startup project (Web) so `dotnet ef` works.
+  -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.8" />
+    <!-- Persist the Data-Protection key ring to the DB (durable across restarts/redeploys; the free host wipes
+         the local filesystem on redeploy → regenerated keys → everyone silently logged out). Adopted from
+         DailyPilot/ExpenseTracker. Free Microsoft package. -->
+    <PackageVersion Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="10.0.8" />
+  </ItemGroup>
+
+  <!--
+    Milestone 1.3 — authentication vertical (ASP.NET Identity + Google OAuth). The Identity EF stores
+    already arrive via the 1.2 group; only the Google external-login handler is added here. Pinned to
+    the 10.0.x line to match the ASP.NET Core 10 runtime. Free Microsoft package.
+  -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.Google" Version="10.0.8" />
+  </ItemGroup>
+
+  <!--
+    Milestone 2.0 — TMDB integration resilience. Microsoft.Extensions.Http.Resilience is the free (MIT),
+    first-party resilience handler (Polly v8 under the hood) applied to the typed TMDB HttpClient via
+    AddStandardResilienceHandler() — rate limiter, total + per-attempt timeouts, retry with backoff that
+    honors Retry-After on 429, circuit breaker (ADR 0006 §2.2). Pinned to the latest stable 10.x line,
+    which targets net10.0. Only Cinora.Infrastructure references it.
+  -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.7.0" />
+  </ItemGroup>
+
+  <!--
+    Milestone 1.4 — Application request pipeline + cross-cutting concerns. All free (Apache-2.0);
+    NO MediatR (commercial-licensed) — the mediator is hand-rolled in Cinora.Application.
+    - FluentValidation (+ DI extensions) are Application-layer: validators + AddValidatorsFromAssembly.
+    - Serilog.AspNetCore + the Console/File sinks are Web-layer: two-stage bootstrap logging and
+      UseSerilogRequestLogging. Serilog.Sinks.Console 6.1.1 / Serilog.Sinks.File 7.0.0 are the latest
+      stable lines; both target Serilog 4.x, matching Serilog.AspNetCore 10.0.0 (ASP.NET Core 10).
+  -->
+  <ItemGroup>
+    <PackageVersion Include="FluentValidation" Version="12.1.1" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+  <!--
+    Milestone 1.3 — integration-test host. Microsoft.AspNetCore.Mvc.Testing supplies
+    WebApplicationFactory<Program> for in-process end-to-end tests of the auth vertical against a real
+    LocalDB database (ADR 0002 — Testcontainers unavailable). Pinned to the 10.0.x line to match the
+    ASP.NET Core 10 runtime. Free Microsoft package; only the test project references it.
+  -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.8" />
+  </ItemGroup>
+
+  <!--
+    Milestone 2.2 (F1–F5 catalog fix round) — deterministic race-path unit tests over a REAL relational
+    engine. SQLite in-memory (a single shared open connection) replaces the EF Core InMemory provider so the
+    unique indexes (Genre.TmdbGenreId, Movie.(TmdbId,MediaType)) are actually ENFORCED — InMemory silently
+    ignores them and therefore literally cannot reproduce the H-1 genre-insert-race 500 (review finding M-2).
+    Both are free Microsoft packages (MIT); test-projects only. Pinned to the copies in the local NuGet cache
+    for an offline restore: the EF Core Sqlite provider at 10.0.5 (its shared EF Core deps unify UP to the
+    10.0.8 abstractions already referenced) and Microsoft.Data.Sqlite at 10.0.7 (supplies SqliteConnection —
+    the type the shared-store fixture news up directly — and pulls Microsoft.Data.Sqlite.Core 10.0.7).
+  -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.7" />
+  </ItemGroup>
+
+  <!--
+    Milestone 5.0 — the free, local AI recommendation engine (ADR 0016). This is the first LLM boundary.
+    - Microsoft.Extensions.AI supplies the provider-agnostic IChatClient abstraction + AddChatClient DI helper.
+    - Microsoft.Extensions.AI.OpenAI adapts an OpenAI-compatible client to IChatClient via AsIChatClient().
+    - OpenAI is that client, pointed at the LOCAL, free Ollama /v1 endpoint (http://localhost:11434/v1) — it
+      is NEVER pointed at the paid api.openai.com (CLAUDE.md free-only constraint; a free-tier cloud model is
+      a config swap, not a code change).
+    All three are MIT-licensed (verified in each .nuspec) and ship native net10.0 assemblies. The versions form
+    a consistent transitive graph: AI 10.5.0 + AI.OpenAI 10.5.0 both bind AI.Abstractions 10.5.0; AI.OpenAI
+    10.5.0 binds OpenAI 2.10.0 (which brings System.ClientModel 1.10.0 for ApiKeyCredential). Only
+    Cinora.Infrastructure references these — the vendor types stay behind the IRecommendationEngine port.
+  -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.5.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.5.0" />
+    <PackageVersion Include="OpenAI" Version="2.10.0" />
+  </ItemGroup>
+
+  <!--
+    Milestone 5.3 — the Hangfire OSS precompute scheduler + admin-gated /jobs dashboard (ADR 0018, redeeming ADR
+    0007's Hangfire deferral). Hangfire.Core/AspNetCore/SqlServer are LGPLv3 — free, open-source, $0, no Docker,
+    and the explicitly approved substitution in CLAUDE.md's table (NOT Hangfire Pro). Pinned to 1.8.17 (probe-
+    verified to restore in this environment) targeting net10.0.
+      - Hangfire.Core is referenced by Cinora.Infrastructure (the job's [DisableConcurrentExecution]/[AutomaticRetry]
+        attributes + Cron/RecurringJob types).
+      - Hangfire.AspNetCore (client + AddHangfireServer + MapHangfireDashboard) and Hangfire.SqlServer (UseSqlServerStorage)
+        are referenced by Cinora.Web (the composition root).
+    Newtonsoft.Json 13.0.3 (MIT) is a REQUIRED DIRECT override: Hangfire transitively pulls Newtonsoft.Json 11.0.1,
+    which triggers NU1903 (a known HIGH-severity advisory) and would fail the 0-warning build + the security gate.
+    Referencing 13.0.3 directly in every project that pulls Hangfire (Infrastructure + Web) overrides the vulnerable
+    transitive 11.0.1. `dotnet restore`/`dotnet build` must report NO NU1903 (nor any other NU19xx) after this.
+  -->
+  <ItemGroup>
+    <PackageVersion Include="Hangfire.Core" Version="1.8.17" />
+    <PackageVersion Include="Hangfire.AspNetCore" Version="1.8.17" />
+    <PackageVersion Include="Hangfire.SqlServer" Version="1.8.17" />
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <!--
+    Milestone 6.2 — Web Push (self-generated VAPID) over the Device entity (ADR 0020). WebPush 1.0.13 is the
+    free, MIT-licensed .NET port of web-push (RFC 8291 aes128gcm payload encryption + RFC 8292 VAPID). It is the
+    ONE new server dependency Phase 6 adds; MIT (verified in the .nuspec) and permitted under the free-only rule
+    (unlike the commercially-licensed MediatR/FluentAssertions). It restores with only a transitive
+    Portable.BouncyCastle 1.9.0 (MIT); NO Newtonsoft, and the vulnerable-package audit is clean (no override
+    needed). Referenced by Cinora.Infrastructure ONLY: the vendor PushSubscription/VapidDetails types stay inside
+    the WebPushSender adapter and never cross into Application/Domain (the dependency rule) — the IPushSender port
+    speaks Application-owned primitives (ADR 0020 §2).
+  -->
+  <ItemGroup>
+    <PackageVersion Include="WebPush" Version="1.0.13" />
+  </ItemGroup>
+
+  <!--
+    Forgot/Reset-password email over SMTP. MailKit (+ its MimeKit dependency) is the free, MIT-licensed,
+    cross-platform SMTP client Microsoft itself recommends over the legacy System.Net.Mail.SmtpClient. Referenced
+    by Cinora.Infrastructure ONLY (the SmtpEmailSender adapter behind the Application IEmailSender port). Pinned to
+    4.17.0 to match the sibling app's known-good version. Gmail-friendly (smtp.gmail.com:587 STARTTLS + App Password).
+  -->
+  <ItemGroup>
+    <PackageVersion Include="MailKit" Version="4.17.0" />
+    <PackageVersion Include="MimeKit" Version="4.17.0" />
+  </ItemGroup>
+
+  <!--
+    Friends & Social Overhaul, Task B0.1 — NSubstitute is CLAUDE.md's designated test-double library
+    (FluentAssertions/Moq are commercial/GPL-adjacent and banned), but it had not yet been wired into any
+    test project. Pinned to the latest stable 5.3.0 (MIT-licensed); referenced by Cinora.Web.IntegrationTests
+    only, to stub ITmdbImageUrlBuilder/IUrlHelperFactory in TmdbImageTagHelperTests.
+  -->
+  <ItemGroup>
+    <PackageVersion Include="NSubstitute" Version="5.3.0" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,282 @@
+@model TitleDetailsVm
+@{
+    ViewData["Title"] = Model.Title;
+
+    var mediaLabel = Model.MediaType == MediaType.Series ? "Series" : "Movie";
+
+    // Runtime: minutes → "2h 3m" / "1h" / "45m". Null/zero → omitted from the metadata line.
+    string? runtimeText = null;
+    if (Model.Runtime is int rt && rt > 0)
+    {
+        var hours = rt / 60;
+        var mins = rt % 60;
+        runtimeText = hours > 0
+            ? (mins > 0 ? $"{hours}h {mins}m" : $"{hours}h")
+            : $"{mins}m";
+    }
+
+    // Dot-separated metadata parts (year · runtime); genres render as chips below, not here.
+    var metaParts = new List<string>();
+    if (Model.ReleaseYear is int yr)
+    {
+        metaParts.Add(yr.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+    if (runtimeText is not null)
+    {
+        metaParts.Add(runtimeText);
+    }
+
+    // TMDB vote is a LABELED reference (Cinora's own ratings arrive Phase 3). Guard VoteCount == 0.
+    var hasVotes = Model.VoteCount > 0;
+    var voteAvg = Model.VoteAverage.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+    var voteCountText = Model.VoteCount.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
+}
+
+@*
+    Milestone 2.5 — the Details page (static, server-rendered; NO Alpine, NO hx-* writes on this page). A
+    backdrop hero with a gradient scrim (premium rule: never text directly on raw art), the poster, title +
+    metadata + a LABELED TMDB vote reference, overview, a ranked cast summary, an on-brand community-rating
+    placeholder, and an inert (Phase-2 stub) watchlist button. Images go through the TMDB tag-helper
+    (W1280 backdrop / W500 poster / W185 cast; null path → the same-origin placeholder). CSP is untouched:
+    image.tmdb.org is already allowed by img-src, and there is no inline/eval script here.
+*@
+<article>
+    <!-- ── Hero ─────────────────────────────────────────────────────────────────────────────────── -->
+    <section class="relative isolate overflow-hidden">
+        @* Backdrop + scrim. The scrim only BLENDS the art into the page surface — the title text does NOT
+           rely on it for contrast (it sits on its own ≥95%-opaque panel below), so AA legibility holds over
+           ANY backdrop, including a bright film still (WCAG 1.4.3 is measured on the tint, not the blur).
+           A null backdrop degrades to a plain premium surface (never a broken hero). Decorative → aria-hidden. *@
+        <div class="absolute inset-0" aria-hidden="true">
+            @if (Model.BackdropPath is not null)
+            {
+                <img asp-tmdb-poster="@Model.BackdropPath" asp-tmdb-size="W1280" alt=""
+                     loading="eager" class="h-full w-full object-cover object-top" />
+            }
+            <div class="absolute inset-0 bg-gradient-to-t from-surface-0 via-surface-0/60 to-surface-0/25"></div>
+        </div>
+
+        <div class="relative mx-auto w-full max-w-6xl px-4 sm:px-6">
+            <nav aria-label="Breadcrumb" class="pt-6">
+                <a asp-controller="Discovery" asp-action="Index"
+                   class="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted transition-colors hover:text-ink">
+                    <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    Back to Discover
+                </a>
+            </nav>
+
+            @* Softened the desktop float (md:pt-24, was md:pt-32) so the block hugs the opaque foot rather
+               than riding up into the thin part of the scrim. *@
+            <div class="flex flex-col gap-6 pb-10 pt-8 sm:pb-14 md:flex-row md:items-end md:gap-8 md:pt-24">
+                @* Poster — fixed 2:3 frame (reused from the card pattern) so the image reserves space. *@
+                <div class="w-36 shrink-0 sm:w-44 md:w-56">
+                    <div class="poster-frame aspect-[2/3]">
+                        <img asp-tmdb-poster="@Model.PosterPath" asp-tmdb-size="W500"
+                             alt="Poster for @Model.Title" loading="eager" class="poster-img" />
+                    </div>
+                </div>
+
+                @* Title block on a ≥95%-opaque frosted panel: contrast is guaranteed by the panel TINT (not
+                   the blur, which WCAG ignores), so every token — accent label, h1, tagline, metadata, chips,
+                   vote pill — passes AA even over a worst-case bright backdrop. All small text is ink-muted
+                   (not ink-subtle); the chips/vote pill also carry opaque OWN fills so they never depend on
+                   whatever is behind them (WCAG 1.4.3). *@
+                <div class="animate-rise-in min-w-0 flex-1 rounded-card border border-white/10 bg-surface-1/95 p-5 shadow-glass backdrop-blur-glass sm:p-7">
+                    <p class="text-xs font-semibold uppercase tracking-widest text-accent">@mediaLabel</p>
+                    <h1 class="mt-2 font-display text-4xl font-semibold text-ink sm:text-5xl">@Model.Title</h1>
+
+                    @if (Model.Tagline is not null)
+                    {
+                        <p class="mt-3 max-w-2xl text-lg italic text-ink-muted">@Model.Tagline</p>
+                    }
+
+                    @if (metaParts.Count > 0)
+                    {
+                        <div class="mt-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-ink-muted">
+                            @for (var i = 0; i < metaParts.Count; i++)
+                            {
+                                if (i > 0)
+                                {
+                                    <span aria-hidden="true" class="text-ink-muted">&middot;</span>
+                                }
+                                <span>@metaParts[i]</span>
+                            }
+                        </div>
+                    }
+
+                    @if (Model.Genres.Count > 0)
+                    {
+                        <ul role="list" class="mt-4 flex flex-wrap gap-2">
+                            @foreach (var genre in Model.Genres)
+                            {
+                                <li class="rounded-pill border border-white/10 bg-surface-2/90 px-3 py-1 text-xs font-medium text-ink-muted">@genre</li>
+                            }
+                        </ul>
+                    }
+
+                    @* LABELED TMDB reference — clearly TMDB's score, not Cinora's. role="img" gives the SR a
+                       single clean phrase; the visible text stays for sighted users. *@
+                    @if (hasVotes)
+                    {
+                        <div class="mt-5 inline-flex items-center gap-2 rounded-pill border border-white/10 bg-surface-2/90 px-3.5 py-1.5"
+                             role="img" aria-label="TMDB rating @voteAvg out of 10, from @voteCountText votes">
+                            <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4 text-accent" aria-hidden="true">
+                                <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 .5l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+                            </svg>
+                            <span class="text-sm text-ink" aria-hidden="true">
+                                <span class="font-semibold">TMDB @voteAvg</span><span class="text-ink-muted">/10</span>
+                                <span class="ml-1 text-ink-muted">· @voteCountText votes</span>
+                            </span>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="mt-5 text-sm text-ink-muted">Not yet rated on TMDB.</p>
+                    }
+
+                    @* Milestone 4.3 — the real watchlist status control (§5.3), replacing the Phase-2 stub. The
+                       controller resolves the current user's status (authed) after first-touch persistence and
+                       passes the control model via ViewData; anonymous viewers get the sign-in affordance. The
+                       control swaps itself via HTMX on set/remove — instant feedback under the strict CSP. *@
+                    @if (ViewData["WatchlistControl"] is WatchlistControlVm watchlistControl)
+                    {
+                        <div class="mt-7">
+                            <partial name="_WatchlistControl" model="watchlistControl" />
+                        </div>
+                    }
+
+                    @* Movie sharing (§3) — send this title to a friend or group via chat. Authenticated only;
+                       a plain link to the /chat/share picker (no inline JS — the Details page stays CSP-clean). *@
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <div class="mt-4">
+                            <a asp-controller="Chat" asp-action="Share"
+                               asp-route-tmdbId="@Model.TmdbId" asp-route-mediaType="@Model.MediaType"
+                               asp-route-title="@Model.Title" asp-route-posterPath="@Model.PosterPath"
+                               class="inline-flex items-center gap-2 rounded-btn border border-white/15 px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent">
+                                <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M10 3c-4.418 0-8 2.91-8 6.5 0 1.86.96 3.53 2.5 4.7V18l3.06-1.7c.78.13 1.6.2 2.44.2 4.418 0 8-2.91 8-6.5S14.418 3 10 3z" clip-rule="evenodd" />
+                                </svg>
+                                Send to a friend
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Body ─────────────────────────────────────────────────────────────────────────────────── -->
+    <div class="mx-auto w-full max-w-6xl space-y-12 px-4 py-10 sm:space-y-14 sm:px-6 sm:py-12">
+        @if (!string.IsNullOrWhiteSpace(Model.Overview))
+        {
+            <section aria-labelledby="overview-heading" class="max-w-3xl">
+                <h2 id="overview-heading" class="font-display text-2xl text-ink">Overview</h2>
+                <p class="mt-4 text-base leading-relaxed text-ink-muted">@Model.Overview</p>
+            </section>
+        }
+
+        @if (Model.Cast.Count > 0)
+        {
+            <section aria-labelledby="cast-heading">
+                <h2 id="cast-heading" class="font-display text-2xl text-ink">Top billed cast</h2>
+                @* The cast items are intentionally non-linked (no person pages in Phase 2), so the scroller
+                   would otherwise have ZERO focusable descendants — off-screen cast unreachable by keyboard
+                   (WCAG 2.1.1, Level A). Make the overflow container itself focusable (tabindex="0") with an
+                   accessible name; a focused scroll region pans with the arrow/Page keys and the global
+                   :focus-visible ring is the indicator. Scoped to CAST ONLY — the Home/Search _Rail scrollers
+                   keep no tabindex because their cards are links (adding it there would double the focus stops). *@
+                <div class="rail mt-5">
+                    <ul role="list" tabindex="0" aria-label="Top billed cast (scrollable)" class="rail-scroller">
+                        @foreach (var member in Model.Cast)
+                        {
+                            <li class="rail-item w-28 sm:w-32">
+                                @* alt="" — the actor's name is the adjacent text label, so the photo is
+                                   presentational (avoids the SR reading the name twice). *@
+                                <div class="poster-frame aspect-[2/3]">
+                                    <img asp-tmdb-poster="@member.ProfilePath" asp-tmdb-size="W185" alt=""
+                                         class="poster-img" />
+                                </div>
+                                <p class="mt-2 truncate text-sm font-medium text-ink" title="@member.Name">@member.Name</p>
+                                @if (member.Character is not null)
+                                {
+                                    <p class="truncate text-xs text-ink-subtle" title="@member.Character">@member.Character</p>
+                                }
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </section>
+        }
+
+        @* Milestone 3.1 — Cinora member reviews & ratings. The "your review" region and the public reviews
+           list are lazy-loaded via attribute-driven HTMX (hx-trigger="load") so the static Details render is
+           unchanged; both swap in server-rendered, Razor-encoded partials (no client templating of user text).
+           Anonymous users see a sign-in CTA instead of the write region. CSP is untouched (no inline JS). *@
+        @{
+            var mediaSegment = Model.MediaType.ToString().ToLowerInvariant();
+            var detailsPath = $"/discover/title/{mediaSegment}/{Model.TmdbId}";
+        }
+        <section aria-labelledby="cinora-reviews-heading" class="space-y-6">
+            <div class="flex items-center gap-3">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill border border-white/10 bg-surface-2/60 text-accent" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5">
+                        <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 .5l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+                    </svg>
+                </span>
+                @* tabindex="-1" makes the heading a stable focus anchor: site.ts moves focus here after a
+                   delete removes the focused review card (WCAG 2.4.3). *@
+                <h2 id="cinora-reviews-heading" tabindex="-1" class="font-display text-2xl text-ink">Reviews &amp; ratings</h2>
+            </div>
+
+            @* One shared polite status node for CONCISE review announcements ("Your review posted", "Review
+               deleted", "10 more reviews loaded"). The regions below are deliberately NOT aria-live — that
+               would read every full review body on load/append. site.ts writes here after a review swap. *@
+            <span id="reviews-status" class="sr-only" role="status" aria-live="polite"></span>
+
+            @* Inline write-error surface for a failed review WRITE (429/400/404/500 — HTMX won't swap a
+               non-2xx, so without this the user gets zero feedback). Hidden until site.ts fills it on
+               htmx:responseError; role="alert" so it's announced. Persists across region swaps (it lives
+               outside them). No inline JS. *@
+            <div id="review-error" role="alert"
+                 class="hidden rounded-card border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-ink"></div>
+
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                @* Your review: the write form, or your existing review (create-vs-edit resolved server-side).
+                   aria-busy marks the lazy skeleton; site.ts clears it when the partial swaps in (M1). *@
+                <div id="my-review"
+                     hx-get="@Url.Action("Mine", "Reviews", new { tmdbId = Model.TmdbId, media = Model.MediaType })"
+                     hx-trigger="load"
+                     hx-swap="innerHTML"
+                     aria-busy="true">
+                    <div class="skeleton-shimmer h-44 rounded-card" aria-hidden="true"></div>
+                </div>
+            }
+            else
+            {
+                <div class="card-glass px-6 py-8 text-center">
+                    <p class="text-sm text-ink-muted">
+                        Sign in to rate and review <span class="text-ink">@Model.Title</span>.
+                    </p>
+                    <a class="btn btn-primary mt-4 text-sm"
+                       asp-controller="Account" asp-action="Login" asp-route-ReturnUrl="@detailsPath">
+                        Sign in to review
+                    </a>
+                </div>
+            }
+
+            @* The public, keyset-paginated reviews list (lazy-loaded; anonymous-readable). aria-busy marks
+               the lazy skeleton; site.ts clears it when the partial swaps in (M1). NOT aria-live (H4). *@
+            <div id="reviews-list"
+                 hx-get="@Url.Action("Reviews", "Discovery", new { media = mediaSegment, tmdbId = Model.TmdbId })"
+                 hx-trigger="load"
+                 hx-swap="innerHTML"
+                 aria-busy="true">
+                <div class="skeleton-shimmer h-28 rounded-card" aria-hidden="true"></div>
+            </div>
+        </section>
+    </div>
+</article>

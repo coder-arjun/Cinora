@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Milestone 2.0 — Infrastructure unit tests. Test toolchain (xUnit) and IsPackable/IsTestProject are
+    centralized in ../Directory.Build.props. These tests exercise the TMDB adapter (TmdbClient) through a
+    fake HttpMessageHandler backed by recorded JSON fixtures — no live network, no TMDB key.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Cinora.Infrastructure\Cinora.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- Recorded TMDB JSON fixtures (realistic shapes, no secrets) embedded for the mapping tests. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Fixtures\*.json" />
+  </ItemGroup>
+
+</Project>

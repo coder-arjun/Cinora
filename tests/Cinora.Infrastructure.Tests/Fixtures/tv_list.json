@@ -1,0 +1,18 @@
+{
+  "page": 1,
+  "total_pages": 100,
+  "total_results": 2000,
+  "results": [
+    {
+      "id": 1396,
+      "name": "Breaking Bad",
+      "overview": "Walter White, a New Mexico chemistry teacher, is diagnosed with cancer and turns to a life of crime.",
+      "poster_path": "/breaking_bad_poster.jpg",
+      "backdrop_path": "/breaking_bad_backdrop.jpg",
+      "first_air_date": "2008-01-20",
+      "vote_average": 8.9,
+      "vote_count": 14000,
+      "genre_ids": [18, 80]
+    }
+  ]
+}

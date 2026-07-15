@@ -1,0 +1,57 @@
+@{
+    ViewData["Title"] = "You're offline";
+}
+
+@* Milestone 6.1 — the branded PWA offline fallback (ADR 0019). Styled in the luxury dark-glass system,
+   matching the established empty/error-state grammar. The service worker serves this for an uncached
+   navigation while offline. The "Try again" control is enhanced by Scripts/site.ts (data-offline-retry →
+   location.reload) — CSP-safe (bundled, not inline); an "Explore" link is the always-works fallback that
+   the SW can satisfy from a previously-visited /discover cache. Reduced-motion is honored globally. *@
+<section class="relative isolate overflow-hidden">
+    <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div class="absolute -top-24 left-1/2 h-96 w-full max-w-3xl -translate-x-1/2 rounded-full bg-accent/10 blur-3xl"></div>
+        <div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-surface-0"></div>
+    </div>
+
+    <div class="animate-rise-in mx-auto flex max-w-2xl flex-col items-center px-4 py-24 text-center sm:px-6 sm:py-32">
+        <div class="card-glass mb-8 flex h-16 w-16 items-center justify-center rounded-full text-accent">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                 stroke-linecap="round" stroke-linejoin="round" class="h-8 w-8" aria-hidden="true">
+                <path d="M1 1l22 22" />
+                <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
+                <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
+                <path d="M10.71 5.05A16 16 0 0 1 22.58 9" />
+                <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" />
+                <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                <path d="M12 20h.01" />
+            </svg>
+        </div>
+
+        <p class="mb-4 inline-flex items-center gap-2 rounded-pill border border-white/10 bg-surface-1/60 px-4 py-1.5 text-xs font-medium uppercase tracking-widest text-ink-subtle backdrop-blur-glass">
+            Offline
+        </p>
+
+        <h1 class="font-display text-4xl font-semibold text-ink sm:text-5xl">
+            You&rsquo;re offline
+        </h1>
+
+        <p class="mt-6 max-w-md text-lg text-ink-muted">
+            Cinora can&rsquo;t reach the network right now. Pages you&rsquo;ve already visited are still
+            available &mdash; reconnect to pick up where you left off.
+        </p>
+
+        <div class="mt-10 flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row">
+            <button type="button" data-offline-retry class="btn btn-primary w-full sm:w-auto">
+                Try again
+            </button>
+            @* Always-works fallback: the SW can serve a previously-visited /discover from cache. *@
+            <a asp-controller="Discovery" asp-action="Index" class="btn btn-ghost w-full sm:w-auto">
+                Explore Cinora
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
+                    <path d="M4 10h11M11 5l5 5-5 5" />
+                </svg>
+            </a>
+        </div>
+    </div>
+</section>

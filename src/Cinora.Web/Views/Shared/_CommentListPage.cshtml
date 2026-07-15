@@ -1,0 +1,31 @@
+@model CommentListVm
+@{
+    string? nextUrl = null;
+    if (Model.HasMore && Model.NextCursor is { } cursor)
+    {
+        nextUrl = Url.Action("List", "Comments", new
+        {
+            id = Model.ReviewId,
+            cursorCreatedAt = cursor.CreatedAtUtc.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+            cursorId = cursor.Id,
+        });
+    }
+}
+
+@*
+    Milestone 3.2 — the comment load-more fragment (a cursor request). Returned by the sentinel's hx-get and
+    swapped via outerHTML in place of that sentinel, so these cards append to the thread. Iff HasMore, a FRESH
+    sentinel re-arms the chain toward the next (newer) keyset page; otherwise the chain simply stops (no
+    sentinel). Attribute-only HTMX — no hx-on, no inline JS.
+*@
+@foreach (var comment in Model.Items)
+{
+    <partial name="_CommentCard" model="comment" />
+}
+
+@if (nextUrl is not null)
+{
+    <div hx-get="@nextUrl" hx-trigger="revealed" hx-swap="outerHTML" aria-hidden="true">
+        <div class="skeleton-shimmer h-12 rounded-card"></div>
+    </div>
+}

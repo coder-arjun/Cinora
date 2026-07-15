@@ -1,0 +1,128 @@
+@model ActivityFeedVm
+@{
+    ViewData["Title"] = "Home";
+
+    string? nextUrl = null;
+    if (Model.HasMore && Model.NextCursor is { } cursor)
+    {
+        nextUrl = Url.Action("Feed", "Home", new
+        {
+            cursorCreatedAt = cursor.CreatedAtUtc.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+            cursorId = cursor.Id,
+        });
+    }
+}
+
+@*
+    Milestone 3.4 — the authenticated home shell IS the friends activity feed (ADR 0012). The first keyset page
+    is server-rendered inline (deep-link + no-JS baseline); a self-replacing HTMX sentinel that reuses the 2.4
+    keyset/sentinel grammar (hx-trigger="revealed" / hx-swap="outerHTML" / terminal state) advances it. The feed
+    is addressed only by its opaque (cursorCreatedAt, cursorId) keyset cursor. All HTMX is attribute-driven — no
+    hx-on, no inline JS — so the strict script-src 'self' CSP is untouched. All user text is Razor output-encoded
+    by the _FeedItem partial (phase-3 XSS stance §3).
+*@
+<section class="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+    <div class="animate-rise-in">
+        <p class="text-xs font-semibold uppercase tracking-widest text-accent">Your feed</p>
+        <h1 class="mt-2 font-display text-4xl text-ink">Home</h1>
+        <p class="mt-3 text-lg text-ink-muted">Recent reviews from your friends, newest first.</p>
+    </div>
+
+    @*
+        Milestone 5.4 — the personalized "For You" rail, ABOVE the friends feed. It lazy-loads via HTMX
+        (hx-get="/recommendations/rail", hx-trigger="load") and swaps in place of this skeleton, so the feed
+        below NEVER blocks on it. The rail's serve is LLM-free (cache → history → heuristic). The hx-get is
+        same-origin, so the strict connect-src 'self' CSP already allows it; a serve failure returns the quiet
+        _RecommendationsRailError partial with HTTP 200 (HTMX won't swap a non-2xx), never an infinite shimmer.
+        Authenticated-only — this page already is.
+    *@
+    @* The mt-10 band margin lives on THIS swap target (not a wrapping <section>), so an EMPTY rail result — which
+       swaps in a zero-height hidden node carrying no margin — collapses the whole band with no dead top margin
+       (empty/CLS fix). The populated + error partials re-declare mt-10 so a non-empty swap keeps the spacing. *@
+    <div class="mt-10 sm:mt-12"
+         hx-get="@Url.Action("Rail", "Recommendations")"
+         hx-trigger="load"
+         hx-swap="outerHTML"
+         aria-busy="true"
+         aria-label="Recommendations for you">
+        @* Shimmer skeleton until the rail streams in; mirrors the real rail (eyebrow + heading + poster row +
+           the two-line "why this" caption) so nothing shifts when the cards swap in. Purely decorative → aria-hidden. *@
+        <div data-rec-skeleton aria-hidden="true">
+            <div class="skeleton-shimmer h-3 w-24 rounded-pill"></div>
+            @* Milestone 6.4 (§6.5, 5.4 exit L1): mirror the real rail's vertical reservation so the friends feed
+               below does not shift when the cards swap in — the heading gap matches _RecommendationsRail's h2 mt-1,
+               and the poster row reserves py-5 top AND bottom to match .rail-scroller's padding-block (was mt-5,
+               top-only, leaving the ~20px bottom-padding CLS). *@
+            <div class="skeleton-shimmer mt-1 h-7 w-40 rounded-pill"></div>
+            <div class="mt-1 flex gap-4 overflow-hidden py-5">
+                @for (var i = 0; i < 6; i++)
+                {
+                    <div class="w-32 shrink-0 sm:w-40 lg:w-44">
+                        <div class="skeleton-shimmer aspect-[2/3] rounded-card"></div>
+                        <div class="skeleton-shimmer mt-3 h-3.5 w-3/4 rounded-pill"></div>
+                        <div class="skeleton-shimmer mt-2 h-3 w-1/3 rounded-pill"></div>
+                        @* Two-line caption placeholder — reserves the SAME height (mt-1.5 + min-h-9) as the real
+                           card's line-clamp-2 "why this" caption, so the friends feed below does NOT shift down
+                           when a captioned set swaps in (CLS fix). *@
+                        <div class="mt-1.5 min-h-9">
+                            <div class="skeleton-shimmer h-2.5 w-full rounded-pill"></div>
+                            <div class="skeleton-shimmer mt-1 h-2.5 w-2/3 rounded-pill"></div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @* One persistent polite node (mirrors #reviews-status / #friends-status): site.ts may copy a concise
+       announcement here after a feed page swap. The load-more sentinel itself is attribute-only. *@
+    <span id="feed-status" class="sr-only" role="status" aria-live="polite"></span>
+
+    @if (!Model.HasFriends)
+    {
+        @* Empty state 1 — no accepted friends yet: a calm "find friends" prompt, never an error. The stable
+           data-feed-empty marker lets tests assert the state without coupling to copy. *@
+        <div data-feed-empty="no-friends" class="mt-10 card-glass px-6 py-12 text-center">
+            <h2 class="font-display text-2xl text-ink">Find friends to build your feed</h2>
+            <p class="mx-auto mt-3 max-w-md text-sm text-ink-muted">
+                Your feed fills up with reviews from your friends. Find people by their exact username or email,
+                or invite friends to Cinora, to get started.
+            </p>
+            @* #8: a single primary CTA to the social hub (find people by exact username/email + WhatsApp invite). *@
+            <div class="mt-6 flex justify-center">
+                <a asp-controller="Friends" asp-action="Index" class="btn btn-primary text-sm">Find friends</a>
+            </div>
+        </div>
+    }
+    else if (Model.Items.Count == 0)
+    {
+        @* Empty state 2 — friends, but none of them have reviewed anything yet: a quiet "no recent activity". *@
+        <div data-feed-empty="no-activity" class="mt-10 card-glass px-6 py-12 text-center">
+            <h2 class="font-display text-2xl text-ink">No recent activity</h2>
+            <p class="mx-auto mt-3 max-w-md text-sm text-ink-muted">
+                When your friends review a movie or series, it will show up here. Why not
+                <a class="link" asp-controller="Discovery" asp-action="Index">review something</a> yourself?
+            </p>
+        </div>
+    }
+    else
+    {
+        @* #3: the feed is a labelled list/region — an sr-only heading names it, and #feed-items is a
+           <ul role="list"> of <li> cards (consistent with _SearchResults). tabindex="-1" lets site.ts move
+           focus here after a swap destroys the focused control (e.g. the _FeedError Retry button, #1). *@
+        <h2 id="feed-heading" class="sr-only">Recent activity</h2>
+        <ul id="feed-items" role="list" tabindex="-1" aria-labelledby="feed-heading" class="mt-10 space-y-5">
+            @foreach (var item in Model.Items)
+            {
+                <li><partial name="_FeedItem" model="item" /></li>
+            }
+
+            @if (nextUrl is not null)
+            {
+                <li hx-get="@nextUrl" hx-trigger="revealed" hx-swap="outerHTML" aria-hidden="true">
+                    <div class="skeleton-shimmer h-36 rounded-card"></div>
+                </li>
+            }
+        </ul>
+    }
+</section>

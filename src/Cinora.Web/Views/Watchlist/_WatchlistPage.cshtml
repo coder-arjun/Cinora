@@ -1,0 +1,48 @@
+@model WatchlistLoadMoreViewModel
+@{
+    var page = Model.Page;
+    var active = Model.ActiveFilter;
+    var sort = Model.Sort;
+    var loaded = page.Items.Count;
+    var moreAnnounce = $"{loaded} more {(loaded == 1 ? "title" : "titles")} loaded";
+
+    string? nextUrl = null;
+    if (page.HasMore && page.NextCursor is { } cursor)
+    {
+        nextUrl = Url.Action("Page", "Watchlist", new
+        {
+            status = active?.ToString(),
+            sort = sort.ToString(),
+            cursorKey = cursor.SortKey.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+            cursorId = cursor.Id,
+        });
+    }
+}
+
+@*
+    Milestone 4.4 — the load-more fragment (a cursor request). Returned by the sentinel's hx-get and swapped via
+    outerHTML in place of that sentinel <li>, so these <li> cards append to the #watchlist-items grid. Iff
+    HasMore, a FRESH sentinel <li> re-arms the chain toward the next keyset page; otherwise a quiet terminal <li>
+    ends it (no sentinel → the chain stops). Each sentinel/terminal carries a data-watchlist-announce string the
+    frontend pass copies into the polite #watchlist-page-status node (mirrors data-feed-announce). Attribute-only
+    HTMX — no hx-on, no inline JS — so the strict CSP is untouched.
+*@
+@foreach (var item in page.Items)
+{
+    <li><partial name="_WatchlistCard" model="item" /></li>
+}
+
+@if (nextUrl is not null)
+{
+    <li hx-get="@nextUrl" hx-trigger="revealed" hx-swap="outerHTML" aria-hidden="true" data-watchlist-announce="@moreAnnounce">
+        <div class="skeleton-shimmer aspect-[2/3] rounded-card"></div>
+        <div class="skeleton-shimmer mt-3 h-3.5 w-3/4 rounded-pill"></div>
+        <div class="skeleton-shimmer mt-2 h-3 w-1/3 rounded-pill"></div>
+    </li>
+}
+else if (loaded > 0)
+{
+    <li class="col-span-full py-6 text-center text-sm text-ink-subtle" data-watchlist-announce="You've reached the end">
+        You&rsquo;ve reached the end.
+    </li>
+}

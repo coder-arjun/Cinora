@@ -1,0 +1,67 @@
+@model RecommendationSet
+@{
+    ViewData["Title"] = "For You";
+
+    var hasPicks = Model.Picks.Count > 0;
+    var isAi = Model.Source == RecommendationSource.Ai;
+
+    // Honest labelling by source (design §11): a real grounded set is "For You"; the deterministic fallback is a
+    // subtle, truthful "Popular picks". When there are no picks the empty state carries the message, so the header
+    // stays in the neutral "For You" framing rather than announcing a "Popular picks" wall over an empty grid.
+    var heading = hasPicks && !isAi ? "Popular picks" : "For You";
+    var eyebrow = hasPicks && !isAi ? "Trending on Cinora" : "Recommended for you";
+    var lede = hasPicks && !isAi
+        ? "Popular titles to get you started. Rate or save a few and these become personal."
+        : "Personalized picks from the titles you have rated and saved.";
+}
+
+@*
+    Milestone 5.4 — the dedicated "For You" page (Phase 5 design §11). The served RecommendationSet renders as a
+    responsive poster grid of _RecommendationCard (2 → 5 columns). Every read dispatches the LLM-free
+    GetMyRecommendationsQuery (the controller never touches IRecommendationEngine). Empty/heuristic sets render
+    honestly, never as an error. Premium dark/glass styling; motion is transform/opacity only and the global
+    reduced-motion rule collapses it. data-rec-region lets site.ts find the heading to re-home focus after a
+    dismiss removes the focused card.
+*@
+<section class="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6 sm:py-16" data-rec-region>
+    <header class="animate-rise-in mb-10 max-w-2xl sm:mb-12">
+        <p class="inline-flex items-center gap-2 rounded-pill border border-white/10 bg-surface-1/60 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-accent backdrop-blur-glass">
+            @eyebrow
+        </p>
+        <h1 class="mt-5 font-display text-display font-semibold text-ink">@heading</h1>
+        <p class="mt-4 text-lg text-ink-muted">@lede</p>
+    </header>
+
+    @if (!hasPicks)
+    {
+        @* Honest, premium empty state — never an error. The stable data-rec-empty marker lets tests assert the
+           state without coupling to copy; the copy itself lives once in _RecommendationsEmptyState. *@
+        <div data-rec-empty class="card-glass mx-auto max-w-xl px-6 py-12 text-center">
+            <partial name="_RecommendationsEmptyState" />
+        </div>
+    }
+    else
+    {
+        @* An sr-only section heading so the heading order is logical (h1 → h2 → the cards' h3) instead of jumping
+           h1 → h3 (UI L1). *@
+        <h2 class="sr-only">Your picks</h2>
+        <ul id="recommendations-grid" role="list"
+            class="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-6 lg:grid-cols-4 lg:gap-x-8 xl:grid-cols-5">
+            @foreach (var pick in Model.Picks)
+            {
+                <li data-rec-item>
+                    <partial name="_RecommendationCard" model="pick" />
+                </li>
+            }
+        </ul>
+
+        @* When the user DISMISSES every card client-side the grid empties, but this page's <h1> still promises
+           picks — so ship the honest empty state here, HIDDEN, for site.ts to reveal once the last
+           [data-rec-item] is removed (UI L4). Same copy as the initial empty state (shared partial). It is
+           server-rendered and trusted, so the dismiss handler only toggles its [hidden] attribute — never
+           innerHTML. *@
+        <div data-rec-live-empty hidden class="card-glass mx-auto max-w-xl px-6 py-12 text-center">
+            <partial name="_RecommendationsEmptyState" />
+        </div>
+    }
+</section>

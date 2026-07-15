@@ -1,0 +1,1944 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Cinora.Infrastructure</name>
+    </assembly>
+    <members>
+        <member name="T:Cinora.Infrastructure.Ai.AiLog">
+            <summary>
+            Source-generated, high-performance log messages for <see cref="T:Cinora.Infrastructure.Ai.OllamaRecommendationEngine"/> (CA1848 —
+            arguments are evaluated only when the level is enabled). Every message is METRICS-ONLY — model name,
+            counts, token usage, timeout — and NEVER the prompt or the model's response body, so no user data (even the
+            PII-free titles and genres in the prompt) is written to the log (the Phase 5 §12 prompt-hygiene rule and
+            the ai-agent standard "log metrics, not content"). Defined in a dedicated non-generic partial type because
+            the logging source generator does not emit for generic containing types.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Ai.AiLog.RankSucceeded(Microsoft.Extensions.Logging.ILogger,System.String,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Logs "AI ranking succeeded for model {Model}: {PickCount} pick(s) from {CandidateCount} candidate(s), {PromptTokens} prompt + {CompletionTokens} completion tokens" at "Information" level.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Ai.AiLog.EmptyResponse(Microsoft.Extensions.Logging.ILogger,System.String)">
+            <summary>
+            Logs "AI model {Model} returned an empty response; degrading to no picks" at "Warning" level.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Ai.AiLog.UnusableResponse(Microsoft.Extensions.Logging.ILogger,System.String,System.Int32)">
+            <summary>
+            Logs "AI model {Model} returned an unusable ({ResponseLength}-char) response that was not valid ranking JSON; degrading to no picks" at "Warning" level.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Ai.AiLog.RankTimedOut(Microsoft.Extensions.Logging.ILogger,System.Exception,System.String,System.Int32)">
+            <summary>
+            Logs "AI ranking timed out after {TimeoutSeconds}s for model {Model}" at "Warning" level.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Ai.AiLog.RankFailed(Microsoft.Extensions.Logging.ILogger,System.Exception,System.String)">
+            <summary>
+            Logs "AI ranking failed for model {Model}; the model was unavailable" at "Warning" level.
+            </summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Ai.OllamaRecommendationEngine">
+            <summary>
+            The free, local <see cref="T:Cinora.Application.Common.Interfaces.IRecommendationEngine"/> adapter (ADR 0016). It ranks and explains a supplied
+            candidate set with a Large Language Model reached through a Microsoft.Extensions.AI <see cref="T:Microsoft.Extensions.AI.IChatClient"/>
+            — the default provider is a local Ollama model over its OpenAI-compatible <c>/v1</c> endpoint (no API key,
+            no rate limits, nothing leaves the machine). It builds a compact, PII-free prompt from the Application
+            <see cref="T:Cinora.Application.Common.Ai.RecommendationRequest"/>, asks for structured JSON at a low temperature under a per-request
+            timeout, then parses and validates the response into <see cref="T:Cinora.Application.Common.Ai.RankedPick"/>s. The vendor types
+            (<see cref="T:Microsoft.Extensions.AI.IChatClient"/>, <see cref="T:Microsoft.Extensions.AI.ChatMessage"/>, <see cref="T:Microsoft.Extensions.AI.ChatOptions"/>) stay entirely inside this
+            class; the port speaks only Cinora types (ADR 0016). Two failure postures, deliberately different:
+            <list type="bullet">
+              <item>a transport failure or the per-request timeout throws <see cref="T:Cinora.Application.Common.Exceptions.RecommendationEngineException"/>
+              so the caller degrades to its fallback (ADR 0018);</item>
+              <item>a malformed or empty model body is NOT an error — it degrades in place to an empty pick set (the
+              caller treats "no picks" as a generation miss and falls back), mirroring <c>CachedTmdbClient</c>'s
+              "degrade, never crash" posture.</item>
+            </list>
+            Internal: the composition root registers it behind the Application port. Candidate generation and the
+            authoritative hallucination guard belong to Milestone 5.1 — this adapter simply ranks whatever set it is
+            handed (and defensively drops any off-list pick anyway).
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Ai.OllamaRecommendationEngine.#ctor(Microsoft.Extensions.AI.IChatClient,Microsoft.Extensions.Options.IOptions{Cinora.Infrastructure.Options.AiOptions},Microsoft.Extensions.Logging.ILogger{Cinora.Infrastructure.Ai.OllamaRecommendationEngine})">
+            <summary>Creates the engine over a chat client, the AI options, and a logger.</summary>
+            <param name="chat">The provider-agnostic chat client (Ollama by default).</param>
+            <param name="options">The AI options supplying the model, timeout, and output-token cap.</param>
+            <param name="logger">The logger used for metrics-only structured events.</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.Ai.OllamaRecommendationEngine.RankAsync(Cinora.Application.Common.Ai.RecommendationRequest,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Ai.RecommendationPolicy">
+            <summary>
+            The Infrastructure implementation of <see cref="T:Cinora.Application.Common.Interfaces.IRecommendationPolicy"/> over
+            <see cref="T:Cinora.Infrastructure.Options.RecommendationOptions"/>. It exposes the recommendation caps to the Application seams (the taste
+            builder, the candidate source, and the generation handler) without the Application referencing this Options
+            type — the dependency rule (ADR 0001), mirroring the Phase-4 <c>UploadPolicy</c>/<c>IUploadPolicy</c>
+            precedent. Reads <c>IOptions&lt;RecommendationOptions&gt;.Value</c> (bound once at startup — the caps are boot
+            configuration, not hot-reloaded; switch to <c>IOptionsMonitor</c> if live reload is ever wanted).
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Ai.RecommendationPolicy.#ctor(Microsoft.Extensions.Options.IOptions{Cinora.Infrastructure.Options.RecommendationOptions})">
+            <summary>Initializes the policy over the bound recommendation options.</summary>
+            <param name="options">The recommendation options supplying the caps.</param>
+        </member>
+        <member name="P:Cinora.Infrastructure.Ai.RecommendationPolicy.MaxTopRated">
+            <inheritdoc />
+        </member>
+        <member name="P:Cinora.Infrastructure.Ai.RecommendationPolicy.MaxWatchlistTitles">
+            <inheritdoc />
+        </member>
+        <member name="P:Cinora.Infrastructure.Ai.RecommendationPolicy.MaxFavoriteGenres">
+            <inheritdoc />
+        </member>
+        <member name="P:Cinora.Infrastructure.Ai.RecommendationPolicy.MaxRecommendationSeeds">
+            <inheritdoc />
+        </member>
+        <member name="P:Cinora.Infrastructure.Ai.RecommendationPolicy.MaxCandidates">
+            <inheritdoc />
+        </member>
+        <member name="P:Cinora.Infrastructure.Ai.RecommendationPolicy.MaxResults">
+            <inheritdoc />
+        </member>
+        <member name="P:Cinora.Infrastructure.Ai.RecommendationPolicy.MaxReasonLength">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Ai.ServedRecommendationCache">
+            <summary>
+            The <see cref="T:Cinora.Application.Common.Interfaces.IServedRecommendationCache"/> adapter over the free in-memory <see cref="T:Microsoft.Extensions.Caching.Distributed.IDistributedCache"/>
+            (ADR 0018 §2, Phase 5 design §7.1). It owns every mechanic the port hides from the handlers (SRP, exactly like
+            <c>CachedTmdbClient</c>): the per-user key <c>cinora:ai:recs:{userId}</c>, a System.Text.Json round-trip of the
+            Application <see cref="T:Cinora.Application.Features.Recommendations.RecommendationSet"/>, a ≈24 h TTL (<see cref="P:Cinora.Infrastructure.Options.RecommendationOptions.ServedCacheTtlHours"/>,
+            aligned to the nightly precompute) with ±10% jitter so co-warmed keys do not expire in unison, and — critically
+            — <b>graceful degradation</b>: every read/write is wrapped so a cache fault logs a Warning and returns a
+            miss / no-ops; a cache outage NEVER surfaces as an error. Stateless over the singleton
+            <see cref="T:Microsoft.Extensions.Caching.Distributed.IDistributedCache"/>, so registered as a singleton. Internal: the composition root registers it
+            behind the Application port.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Ai.ServedRecommendationCache.#ctor(Microsoft.Extensions.Caching.Distributed.IDistributedCache,Microsoft.Extensions.Options.IOptions{Cinora.Infrastructure.Options.RecommendationOptions},Microsoft.Extensions.Logging.ILogger{Cinora.Infrastructure.Ai.ServedRecommendationCache})">
+            <summary>Creates the adapter over the distributed cache, the recommendation options, and a logger.</summary>
+            <param name="cache">The distributed cache (the free in-memory provider by default).</param>
+            <param name="options">The recommendation options supplying <see cref="P:Cinora.Infrastructure.Options.RecommendationOptions.ServedCacheTtlHours"/>.</param>
+            <param name="logger">The logger used to record cache degradation at Warning.</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.Ai.ServedRecommendationCache.GetAsync(System.Guid,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Ai.ServedRecommendationCache.SetAsync(System.Guid,Cinora.Application.Features.Recommendations.RecommendationSet,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Ai.ServedRecommendationCacheLog">
+            <summary>
+            Source-generated, high-performance log messages for <see cref="T:Cinora.Infrastructure.Ai.ServedRecommendationCache"/> (CA1848 —
+            arguments are evaluated only when the level is enabled). A cache read or write failure is logged at Warning
+            and then swallowed: the adapter degrades to a miss / no-op rather than surfacing a cache outage as an error
+            (ADR 0018 §2 — the same "degrade, never crash" discipline as <c>CachedTmdbClient</c>). Metrics-only: the key
+            (no recommendation content). Defined in a dedicated non-generic partial type because the logging source
+            generator does not emit for generic containing types.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Ai.ServedRecommendationCacheLog.ReadFailed(Microsoft.Extensions.Logging.ILogger,System.Exception,System.String)">
+            <summary>
+            Logs "Served-recommendation cache read failed for {CacheKey}; treating as a miss" at "Warning" level.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Ai.ServedRecommendationCacheLog.WriteFailed(Microsoft.Extensions.Logging.ILogger,System.Exception,System.String)">
+            <summary>
+            Logs "Served-recommendation cache write failed for {CacheKey}; the set was served but not cached" at "Warning" level.
+            </summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.DependencyInjection">
+            <summary>Composition-root wiring for the Infrastructure layer.</summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.DependencyInjection.AddInfrastructure(Microsoft.Extensions.DependencyInjection.IServiceCollection,Microsoft.Extensions.Configuration.IConfiguration)">
+            <summary>
+            Registers the Infrastructure services: the <see cref="T:Cinora.Infrastructure.Persistence.CinoraDbContext"/> against SQL Server
+            (LocalDB in development) exposed as the Application-owned <see cref="T:Cinora.Application.Common.Interfaces.IAppDbContext"/>, the bound
+            <see cref="T:Cinora.Infrastructure.Options.GoogleAuthOptions"/>, the free-provider options (<see cref="T:Cinora.Infrastructure.Options.TmdbOptions"/> — now
+            <c>ValidateOnStart</c> since Milestone 2.0 consumes TMDB — plus <see cref="T:Cinora.Infrastructure.Options.AiOptions"/>,
+            <see cref="T:Cinora.Infrastructure.Options.CacheOptions"/>, <see cref="T:Cinora.Infrastructure.Options.FileStorageOptions"/>, still lazily validated), the atomic
+            <see cref="T:Cinora.Infrastructure.Identity.IUserRegistrationService"/> seam (Milestone 1.3), and the TMDB integration (the typed
+            <see cref="T:Cinora.Application.Common.Interfaces.ITmdbClient"/> adapter with resilience and the <see cref="T:Cinora.Application.Common.Interfaces.ITmdbImageUrlBuilder"/>,
+            Milestone 2.0). ASP.NET Identity itself (<c>AddIdentity</c>, cookie policy, <c>AddGoogle</c>) is
+            wired at the Web composition root (ADR 0003), which calls this method first.
+            </summary>
+            <param name="services">The service collection being configured.</param>
+            <param name="configuration">Application configuration, source of the <c>DefaultConnection</c> string and the <c>GoogleAuth</c> section.</param>
+            <returns>The same <paramref name="services"/> instance, for chaining.</returns>
+        </member>
+        <member name="M:Cinora.Infrastructure.DependencyInjection.AddPush(Microsoft.Extensions.DependencyInjection.IServiceCollection)">
+            <summary>
+            Registers the Web Push slice (Milestone 6.2, ADR 0020): the bound <see cref="T:Cinora.Infrastructure.Options.WebPushOptions"/> (VAPID
+            credentials) and the two adapters behind their Application ports. <see cref="T:Cinora.Infrastructure.Options.WebPushOptions"/> is validated
+            lazily for FORMAT-if-present but is <b>NOT</b> <c>ValidateOnStart</c>-ed — an absent VAPID configuration
+            degrades push to off, it does not crash boot (design §8, degrade-if-absent). The private VAPID key is a
+            secret and must come from user-secrets / environment, never appsettings.
+            <para>
+            Both adapters are singletons: <see cref="T:Cinora.Infrastructure.Push.WebPushSender"/> owns and reuses one WebPush client (and its inner
+            <c>HttpClient</c>) for the app lifetime — disposed by the container at shutdown — and <see cref="T:Cinora.Infrastructure.Push.InlinePushDispatch"/>
+            is a stateless dispatcher that creates its own fresh scope per send via the injected
+            <see cref="T:Microsoft.Extensions.DependencyInjection.IServiceScopeFactory"/>; neither captures a scoped dependency, so a singleton is correct and
+            avoids per-send <c>HttpClient</c> churn.
+            </para>
+            </summary>
+            <param name="services">The service collection being configured.</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.DependencyInjection.AddAi(Microsoft.Extensions.DependencyInjection.IServiceCollection)">
+            <summary>
+            Registers the free, local AI recommendation engine (Milestone 5.0, ADR 0016): a Microsoft.Extensions.AI
+            <see cref="T:Microsoft.Extensions.AI.IChatClient"/> built from <see cref="T:Cinora.Infrastructure.Options.AiOptions"/> over the OpenAI-compatible protocol Ollama
+            exposes at its local <c>/v1</c> endpoint, and the <see cref="T:Cinora.Infrastructure.Ai.OllamaRecommendationEngine"/> behind the
+            Application <see cref="T:Cinora.Application.Common.Interfaces.IRecommendationEngine"/> port. Endpoint and model come from <see cref="T:Cinora.Infrastructure.Options.AiOptions"/>
+            and are NEVER hardcoded (and never the paid <c>api.openai.com</c>); a free-tier cloud model (Gemini/Groq)
+            is selected by changing those options plus a real free key, with no code change (ADR 0016). The vendor
+            types stay inside the adapter — handlers depend only on the port.
+            </summary>
+            <param name="services">The service collection being configured.</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.DependencyInjection.AddFileStorage(Microsoft.Extensions.DependencyInjection.IServiceCollection)">
+            <summary>
+            Registers the free local file-storage seam (Milestone 4.1, ADR 0013): the magic-byte
+            <see cref="T:Cinora.Infrastructure.Storage.ImageContentInspector"/>, the deterministic bucketed-expiry <see cref="T:Cinora.Infrastructure.Storage.AvatarUrlSigner"/>, the
+            <see cref="T:Cinora.Infrastructure.Storage.LocalFileStorage"/> adapter resolving to both the Application <see cref="T:Cinora.Application.Common.Interfaces.IFileStorage"/> port
+            (upload/mint/delete) and the serving <see cref="T:Cinora.Infrastructure.Storage.IAvatarContentSource"/> seam (read for the media
+            controller), the <see cref="T:Cinora.Application.Common.Interfaces.IUploadPolicy"/> impl over <see cref="T:Cinora.Infrastructure.Options.FileStorageOptions"/>, a
+            <see cref="T:System.TimeProvider"/> for deterministic expiry, and a hosted service that ensures the upload root
+            exists at startup. All are stateless singletons.
+            </summary>
+            <param name="services">The service collection being configured.</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.DependencyInjection.AddTmdb(Microsoft.Extensions.DependencyInjection.IServiceCollection)">
+            <summary>
+            Registers the TMDB integration: the raw <see cref="T:Cinora.Infrastructure.Tmdb.TmdbClient"/> (Milestone 2.0, ADR 0006) as a typed
+            <see cref="T:System.Net.Http.HttpClient"/> with a v4 Bearer default header and the free standard resilience pipeline;
+            the free in-memory <see cref="T:Microsoft.Extensions.Caching.Distributed.IDistributedCache"/>; the Milestone 2.1 cache-aside
+            <see cref="T:Cinora.Infrastructure.Tmdb.CachedTmdbClient"/> to which <see cref="T:Cinora.Application.Common.Interfaces.ITmdbClient"/> now resolves (wrapping the raw
+            client, ADR 0007); and the singleton <see cref="T:Cinora.Application.Common.Interfaces.ITmdbImageUrlBuilder"/>.
+            </summary>
+            <param name="services">The service collection being configured.</param>
+        </member>
+        <member name="T:Cinora.Infrastructure.Email.EmailLog">
+            <summary>
+            Source-generated, high-performance log messages for <see cref="T:Cinora.Infrastructure.Email.SmtpEmailSender"/> (CA1848 — arguments are
+            evaluated only when the level is enabled). Metadata only — the subject and recipient address — NEVER the
+            message body or the SMTP credentials. The Development-only action-link message is emitted by the caller only in
+            Development, so a reset link never reaches a Production log.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Email.EmailLog.NotConfigured(Microsoft.Extensions.Logging.ILogger,System.String,System.String)">
+            <summary>
+            Logs "Email '{Subject}' to {Email} was NOT sent — SMTP is not configured (set Email:Enabled/User/Password)." at "Warning" level.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Email.EmailLog.DevActionLink(Microsoft.Extensions.Logging.ILogger,System.String,System.String)">
+            <summary>
+            Logs "[DEV] Action link for '{Subject}': {Link}" at "Warning" level.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Email.EmailLog.Sent(Microsoft.Extensions.Logging.ILogger,System.String,System.String)">
+            <summary>
+            Logs "Email '{Subject}' sent to {Email}." at "Information" level.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Email.EmailLog.Failed(Microsoft.Extensions.Logging.ILogger,System.Exception,System.String,System.String)">
+            <summary>
+            Logs "Failed to send email '{Subject}' to {Email}." at "Error" level.
+            </summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Email.SmtpEmailSender">
+            <summary>
+            The <see cref="T:Cinora.Application.Common.Interfaces.IEmailSender"/> adapter: sends HTML mail over SMTP with MailKit (STARTTLS on the submission
+            port), configured for Gmail by default but working with any SMTP host. It reads <see cref="T:Cinora.Infrastructure.Options.EmailOptions"/> and
+            deliberately DEGRADES rather than throws — when the mailer is not configured it logs a Warning and returns, so
+            the forgot-password flow never 500s and never reveals whether an address exists. As a Development convenience,
+            when mail is off it also surfaces the action link (the reset URL) in the logs so the flow can be exercised with
+            no mail server; this is guarded to Development and never leaks links in Production. Internal — the composition
+            root registers it behind the Application port; the MimeKit/MailKit types never cross the dependency rule.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Email.SmtpEmailSender.#ctor(Microsoft.Extensions.Options.IOptions{Cinora.Infrastructure.Options.EmailOptions},Microsoft.Extensions.Hosting.IHostEnvironment,Microsoft.Extensions.Logging.ILogger{Cinora.Infrastructure.Email.SmtpEmailSender})">
+            <summary>Creates the sender over the bound email options, the host environment, and a logger.</summary>
+            <param name="options">The bound <see cref="T:Cinora.Infrastructure.Options.EmailOptions"/> (host, port, credentials, from).</param>
+            <param name="environment">The host environment, used to guard the Development link-surfacing convenience.</param>
+            <param name="logger">The logger used for send/degrade diagnostics (never logs credentials).</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.Email.SmtpEmailSender.SendAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Email.SmtpEmailSender.HrefPattern">
+            <remarks>
+            Pattern:<br/>
+            <code>href=["'](?&lt;u&gt;[^"']+)["']</code><br/>
+            Options:<br/>
+            <code>RegexOptions.IgnoreCase</code><br/>
+            Explanation:<br/>
+            <code>
+            ○ Match a character in the set [Hh].<br/>
+            ○ Match a character in the set [Rr].<br/>
+            ○ Match a character in the set [Ee].<br/>
+            ○ Match a character in the set [Ff].<br/>
+            ○ Match '='.<br/>
+            ○ Match a character in the set ["'].<br/>
+            ○ "u" capture group.<br/>
+                ○ Match a character in the set [^"'] atomically at least once.<br/>
+            ○ Match a character in the set ["'].<br/>
+            </code>
+            </remarks>
+        </member>
+        <member name="T:Cinora.Infrastructure.Identity.ApplicationUser">
+            <summary>
+            Cinora's ASP.NET Identity principal. It carries the authentication surface only — credentials,
+            email confirmation, security stamp, external logins, and lockout — and adds no profile or social
+            state. That state lives on the pure <see cref="T:Cinora.Domain.Entities.User"/> aggregate, which
+            shares this principal's <see cref="T:System.Guid"/> primary key in a 1:1 relationship (ADR 0003).
+            </summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Identity.CurrentUser">
+            <summary>
+            The <see cref="T:Cinora.Application.Common.Interfaces.ICurrentUser"/> adapter (ADR 0009): resolves the acting user's id from the current
+            request's <see cref="T:System.Security.Claims.ClaimsPrincipal"/> — the <see cref="F:System.Security.Claims.ClaimTypes.NameIdentifier"/> claim ASP.NET
+            Identity stamps with <see cref="T:Cinora.Infrastructure.Identity.ApplicationUser"/>'s <see cref="T:System.Guid"/> key (the same claim the SignalR
+            notification hub reads in Milestone 3.5). Scoped, over <see cref="T:Microsoft.AspNetCore.Http.IHttpContextAccessor"/>; a background
+            context (no HTTP request, e.g. a future Hangfire job) reads as anonymous.
+            </summary>
+            <param name="httpContextAccessor">Accessor for the current request's <see cref="T:Microsoft.AspNetCore.Http.HttpContext"/>.</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.Identity.CurrentUser.#ctor(Microsoft.AspNetCore.Http.IHttpContextAccessor)">
+            <summary>
+            The <see cref="T:Cinora.Application.Common.Interfaces.ICurrentUser"/> adapter (ADR 0009): resolves the acting user's id from the current
+            request's <see cref="T:System.Security.Claims.ClaimsPrincipal"/> — the <see cref="F:System.Security.Claims.ClaimTypes.NameIdentifier"/> claim ASP.NET
+            Identity stamps with <see cref="T:Cinora.Infrastructure.Identity.ApplicationUser"/>'s <see cref="T:System.Guid"/> key (the same claim the SignalR
+            notification hub reads in Milestone 3.5). Scoped, over <see cref="T:Microsoft.AspNetCore.Http.IHttpContextAccessor"/>; a background
+            context (no HTTP request, e.g. a future Hangfire job) reads as anonymous.
+            </summary>
+            <param name="httpContextAccessor">Accessor for the current request's <see cref="T:Microsoft.AspNetCore.Http.HttpContext"/>.</param>
+        </member>
+        <member name="P:Cinora.Infrastructure.Identity.CurrentUser.UserId">
+            <inheritdoc />
+        </member>
+        <member name="P:Cinora.Infrastructure.Identity.CurrentUser.IsAuthenticated">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Identity.CurrentUser.GetRequiredUserId">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Identity.ILoginResolver">
+            <summary>
+            Resolves a user-supplied login identifier — an email OR a display name — to the Identity principal's
+            <c>UserName</c> so <see cref="T:Microsoft.AspNetCore.Identity.SignInManager`1"/> can complete the
+            password sign-in. Display names are matched case-insensitively via the unique normalized handle. Returns
+            <c>null</c> when no account matches, so the caller can surface one generic error (no user enumeration).
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Identity.ILoginResolver.ResolveUserNameAsync(System.String,System.Threading.CancellationToken)">
+            <summary>Resolves an email-or-display-name to the matching account's Identity user name.</summary>
+            <param name="emailOrDisplayName">The raw identifier the user typed on the sign-in form.</param>
+            <param name="cancellationToken">A token to cancel the lookup.</param>
+            <returns>The Identity <c>UserName</c> to sign in with, or <c>null</c> when no account matches.</returns>
+        </member>
+        <member name="T:Cinora.Infrastructure.Identity.IUserRegistrationService">
+            <summary>
+            Creates a Cinora user atomically: the ASP.NET Identity principal (<see cref="T:Cinora.Infrastructure.Identity.ApplicationUser"/>)
+            and the shared-primary-key domain <see cref="T:Cinora.Domain.Entities.User"/> are written inside a
+            single database transaction, so a failure at any step rolls back both and never leaves an orphan
+            <c>AspNetUsers</c> row (ADR 0003; the Milestone 1.3 blocking requirement). This is the seam the
+            registration flows depend on and integration tests exercise for orphan prevention.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Identity.IUserRegistrationService.RegisterAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>Registers a local email/password account.</summary>
+            <param name="email">The account email address, also used as the sign-in user name.</param>
+            <param name="password">The plaintext password, validated against the Identity password policy.</param>
+            <param name="displayName">The public display name for the domain profile.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+            <returns>
+            A <see cref="T:Cinora.Infrastructure.Identity.UserRegistrationResult"/> describing success (with the shared id) or the Identity
+            failures. Throws if an unexpected error occurs after the principal is created — the transaction
+            is rolled back first so no orphan row remains.
+            </returns>
+        </member>
+        <member name="M:Cinora.Infrastructure.Identity.IUserRegistrationService.RegisterExternalAsync(System.String,System.String,System.String,System.String,System.Boolean,System.Threading.CancellationToken)">
+            <summary>Registers a first-time external (e.g. Google) account and links the external login.</summary>
+            <param name="loginProvider">The external provider name (e.g. <c>Google</c>).</param>
+            <param name="providerKey">The provider's stable user key for this account.</param>
+            <param name="email">The email asserted by the provider; also used as the sign-in user name.</param>
+            <param name="displayName">The public display name seeded from the provider profile.</param>
+            <param name="emailVerified">
+            Whether the provider explicitly asserted the email is verified. When <c>true</c> the created
+            account's email is marked confirmed; otherwise it stays unconfirmed (fail closed).
+            </param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+            <returns>
+            A <see cref="T:Cinora.Infrastructure.Identity.UserRegistrationResult"/> describing success (with the shared id) or the Identity
+            failures. Rolls back on any failure so no orphan row remains.
+            </returns>
+        </member>
+        <member name="T:Cinora.Infrastructure.Identity.LoginResolver">
+            <summary>
+            Default <see cref="T:Cinora.Infrastructure.Identity.ILoginResolver"/>. An identifier containing '@' is treated as an email and resolved on
+            the unique email; anything else is treated as a display name and resolved via the unique, case-insensitive
+            <see cref="P:Cinora.Domain.Entities.User.NormalizedDisplayName"/>, whose shared primary key maps to the Identity principal. Both
+            branches return <c>null</c> on no match so the controller shows a single generic failure (no enumeration).
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Identity.LoginResolver.#ctor(Microsoft.AspNetCore.Identity.UserManager{Cinora.Infrastructure.Identity.ApplicationUser},Cinora.Infrastructure.Persistence.CinoraDbContext)">
+            <summary>
+            Default <see cref="T:Cinora.Infrastructure.Identity.ILoginResolver"/>. An identifier containing '@' is treated as an email and resolved on
+            the unique email; anything else is treated as a display name and resolved via the unique, case-insensitive
+            <see cref="P:Cinora.Domain.Entities.User.NormalizedDisplayName"/>, whose shared primary key maps to the Identity principal. Both
+            branches return <c>null</c> on no match so the controller shows a single generic failure (no enumeration).
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Identity.LoginResolver.ResolveUserNameAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Identity.UserDirectory">
+            <summary>
+            Identity-backed <see cref="T:Cinora.Application.Common.Interfaces.IUserDirectory"/>: exact email lookup via <see cref="T:Microsoft.AspNetCore.Identity.UserManager`1"/>, which
+            normalizes the input and seeks the indexed <c>NormalizedEmail</c>. Returns the shared <see cref="T:System.Guid"/> key
+            that also identifies the domain <c>User</c> (ADR 0003).
+            </summary>
+            <param name="userManager">The Identity user manager.</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.Identity.UserDirectory.#ctor(Microsoft.AspNetCore.Identity.UserManager{Cinora.Infrastructure.Identity.ApplicationUser})">
+            <summary>
+            Identity-backed <see cref="T:Cinora.Application.Common.Interfaces.IUserDirectory"/>: exact email lookup via <see cref="T:Microsoft.AspNetCore.Identity.UserManager`1"/>, which
+            normalizes the input and seeks the indexed <c>NormalizedEmail</c>. Returns the shared <see cref="T:System.Guid"/> key
+            that also identifies the domain <c>User</c> (ADR 0003).
+            </summary>
+            <param name="userManager">The Identity user manager.</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.Identity.UserDirectory.FindUserIdByEmailAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Identity.UserRegistrationResult">
+            <summary>
+            The outcome of an atomic user-registration attempt in which the Identity principal
+            (<see cref="T:Cinora.Infrastructure.Identity.ApplicationUser"/>) and the shared-primary-key domain
+            <see cref="T:Cinora.Domain.Entities.User"/> are created in a single transaction. On success it
+            carries the shared identifier; on failure it carries the human-readable Identity error
+            descriptions and no partial state was persisted (ADR 0003).
+            </summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Identity.UserRegistrationResult.Succeeded">
+            <summary>Whether registration succeeded and both rows were committed together.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Identity.UserRegistrationResult.UserId">
+            <summary>
+            The identifier shared by the Identity principal and the domain user;
+            <see cref="F:System.Guid.Empty"/> when <see cref="P:Cinora.Infrastructure.Identity.UserRegistrationResult.Succeeded"/> is <c>false</c>.
+            </summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Identity.UserRegistrationResult.Errors">
+            <summary>The registration error descriptions; empty when <see cref="P:Cinora.Infrastructure.Identity.UserRegistrationResult.Succeeded"/> is <c>true</c>.</summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Identity.UserRegistrationResult.Success(System.Guid)">
+            <summary>Creates a successful result for the given committed shared identifier.</summary>
+            <param name="userId">The committed shared primary key.</param>
+            <returns>A successful <see cref="T:Cinora.Infrastructure.Identity.UserRegistrationResult"/>.</returns>
+        </member>
+        <member name="M:Cinora.Infrastructure.Identity.UserRegistrationResult.Failure(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>Creates a failed result carrying the supplied error descriptions.</summary>
+            <param name="errors">The human-readable reasons registration failed.</param>
+            <returns>A failed <see cref="T:Cinora.Infrastructure.Identity.UserRegistrationResult"/>.</returns>
+        </member>
+        <member name="T:Cinora.Infrastructure.Identity.UserRegistrationService">
+            <summary>
+            Default <see cref="T:Cinora.Infrastructure.Identity.IUserRegistrationService"/> backed by <see cref="T:Microsoft.AspNetCore.Identity.UserManager`1"/> and the
+            shared <see cref="T:Cinora.Infrastructure.Persistence.CinoraDbContext"/>. Both are resolved from the same request scope, so the store's
+            internal <c>SaveChanges</c> (invoked by <see cref="M:Microsoft.AspNetCore.Identity.UserManager`1.CreateAsync(`0)"/>) runs on
+            the very context on which the explicit transaction is opened — it therefore enlists in that
+            transaction and does not commit until <c>CommitAsync</c> is called. A failure at any step rolls back
+            both the <c>AspNetUsers</c> row and the domain <c>Users</c> row (ADR 0003).
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Identity.UserRegistrationService.#ctor(Microsoft.AspNetCore.Identity.UserManager{Cinora.Infrastructure.Identity.ApplicationUser},Cinora.Infrastructure.Persistence.CinoraDbContext)">
+            <summary>
+            Default <see cref="T:Cinora.Infrastructure.Identity.IUserRegistrationService"/> backed by <see cref="T:Microsoft.AspNetCore.Identity.UserManager`1"/> and the
+            shared <see cref="T:Cinora.Infrastructure.Persistence.CinoraDbContext"/>. Both are resolved from the same request scope, so the store's
+            internal <c>SaveChanges</c> (invoked by <see cref="M:Microsoft.AspNetCore.Identity.UserManager`1.CreateAsync(`0)"/>) runs on
+            the very context on which the explicit transaction is opened — it therefore enlists in that
+            transaction and does not commit until <c>CommitAsync</c> is called. A failure at any step rolls back
+            both the <c>AspNetUsers</c> row and the domain <c>Users</c> row (ADR 0003).
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Identity.UserRegistrationService.RegisterAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Identity.UserRegistrationService.RegisterExternalAsync(System.String,System.String,System.String,System.String,System.Boolean,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Jobs.PrecomputeLog">
+            <summary>
+            Source-generated, high-performance log messages for the <see cref="T:Cinora.Infrastructure.Jobs.RecommendationPrecomputeJob"/> (CA1848 —
+            arguments are evaluated only when the level is enabled). Metrics-only: user ids and counts, never prompt
+            content or a model response body (the Phase 5 §12 hygiene rule). Defined in a dedicated non-generic partial
+            type because the logging source generator does not emit for generic containing types.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Jobs.PrecomputeLog.BatchStarted(Microsoft.Extensions.Logging.ILogger)">
+            <summary>
+            Logs "Recommendation precompute batch started" at "Information" level.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Jobs.PrecomputeLog.UsersSelected(Microsoft.Extensions.Logging.ILogger,System.Int32,System.Int32)">
+            <summary>
+            Logs "Recommendation precompute selected {StaleCount} stale user(s) for regeneration; skipped {SkippedCount} with unchanged taste" at "Information" level.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Jobs.PrecomputeLog.UserDispatched(Microsoft.Extensions.Logging.ILogger,System.Guid)">
+            <summary>
+            Logs "Recommendation precompute dispatched generation for user {UserId}" at "Debug" level.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Jobs.PrecomputeLog.UserFailed(Microsoft.Extensions.Logging.ILogger,System.Exception,System.Guid)">
+            <summary>
+            Logs "Recommendation precompute failed for user {UserId}; continuing with the rest of the batch" at "Warning" level.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Jobs.PrecomputeLog.BatchCompleted(Microsoft.Extensions.Logging.ILogger,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Logs "Recommendation precompute batch complete: {StaleCount} selected, {SkippedCount} skipped, {GeneratedCount} generated, {FailedCount} failed" at "Information" level.
+            </summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Jobs.RecommendationPrecomputeJob">
+            <summary>
+            The nightly Hangfire recurring job that precomputes AI recommendations OFF the request path (Phase 5 design
+            §10, ADR 0018 §5 — redeeming ADR 0007's Hangfire deferral). It is the pipeline's <b>orchestrator</b>: it
+            selects the users whose taste has changed since their last generation and dispatches
+            <see cref="T:Cinora.Application.Features.Recommendations.GenerateRecommendationsCommand"/> for each via <see cref="T:Cinora.Application.Common.Messaging.ISender"/> (the ADR-0008 "job/controller
+            orchestrates, handler stays pure" pattern — never <see cref="T:Cinora.Application.Common.Messaging.ISender"/> inside a handler). It reads no
+            <c>ICurrentUser</c> (a background job has no HTTP context); the target user is always an explicit
+            <see cref="T:System.Guid"/> passed to the command.
+            <para>
+            <b>Idempotent + safe to re-run — within an accurate contract.</b> A user is <em>stale</em> (regenerated) iff
+            they have review/watchlist activity <b>within the lookback window</b> (<see cref="P:Cinora.Infrastructure.Options.RecommendationOptions.PrecomputeLookbackDays"/>)
+            AND (no history row OR their latest history predates their latest activity). A user with a <b>prior successful
+            generation</b> newer than that activity is skipped on the next run (a history row now newer than their
+            activity), so unchanged users cost no duplicate work and gain no extra row. Note the honest edge: a generation
+            that yields an <b>empty</b> set — a thin profile, no candidates, an engine/TMDB outage, or an all-hallucinated
+            result — writes <em>no</em> <c>AIRecommendationHistory</c> row (that table is the successful-AI audit trail), so
+            such a user stays "stale" and is <em>re-attempted on subsequent runs while still inside the lookback window</em>.
+            That re-attempt is desirable (it retries a transient engine/TMDB outage) and self-bounds because the user ages
+            out of the window. A durable taste-hash / attempt marker is the recorded future refinement if persistently-empty
+            re-attempts ever matter at scale (REVIEW_BACKLOG). <c>[DisableConcurrentExecution]</c> guards overlap and
+            per-user failures are caught so one bad user never aborts the batch. All timestamps are UTC.
+            </para>
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Jobs.RecommendationPrecomputeJob.#ctor(Microsoft.Extensions.DependencyInjection.IServiceScopeFactory,Microsoft.Extensions.Options.IOptions{Cinora.Infrastructure.Options.RecommendationOptions},System.TimeProvider,Microsoft.Extensions.Logging.ILogger{Cinora.Infrastructure.Jobs.RecommendationPrecomputeJob})">
+            <summary>
+            The nightly Hangfire recurring job that precomputes AI recommendations OFF the request path (Phase 5 design
+            §10, ADR 0018 §5 — redeeming ADR 0007's Hangfire deferral). It is the pipeline's <b>orchestrator</b>: it
+            selects the users whose taste has changed since their last generation and dispatches
+            <see cref="T:Cinora.Application.Features.Recommendations.GenerateRecommendationsCommand"/> for each via <see cref="T:Cinora.Application.Common.Messaging.ISender"/> (the ADR-0008 "job/controller
+            orchestrates, handler stays pure" pattern — never <see cref="T:Cinora.Application.Common.Messaging.ISender"/> inside a handler). It reads no
+            <c>ICurrentUser</c> (a background job has no HTTP context); the target user is always an explicit
+            <see cref="T:System.Guid"/> passed to the command.
+            <para>
+            <b>Idempotent + safe to re-run — within an accurate contract.</b> A user is <em>stale</em> (regenerated) iff
+            they have review/watchlist activity <b>within the lookback window</b> (<see cref="P:Cinora.Infrastructure.Options.RecommendationOptions.PrecomputeLookbackDays"/>)
+            AND (no history row OR their latest history predates their latest activity). A user with a <b>prior successful
+            generation</b> newer than that activity is skipped on the next run (a history row now newer than their
+            activity), so unchanged users cost no duplicate work and gain no extra row. Note the honest edge: a generation
+            that yields an <b>empty</b> set — a thin profile, no candidates, an engine/TMDB outage, or an all-hallucinated
+            result — writes <em>no</em> <c>AIRecommendationHistory</c> row (that table is the successful-AI audit trail), so
+            such a user stays "stale" and is <em>re-attempted on subsequent runs while still inside the lookback window</em>.
+            That re-attempt is desirable (it retries a transient engine/TMDB outage) and self-bounds because the user ages
+            out of the window. A durable taste-hash / attempt marker is the recorded future refinement if persistently-empty
+            re-attempts ever matter at scale (REVIEW_BACKLOG). <c>[DisableConcurrentExecution]</c> guards overlap and
+            per-user failures are caught so one bad user never aborts the batch. All timestamps are UTC.
+            </para>
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Jobs.RecommendationPrecomputeJob.RunAsync(System.Threading.CancellationToken)">
+            <summary>
+            Runs one precompute batch: select the stale users (a bounded, set-based read), then dispatch a generation
+            for each in a fresh DI scope so every command gets a clean <c>DbContext</c>. Honors the cancellation token
+            between users; a per-user failure is logged and the batch continues.
+            </summary>
+            <param name="cancellationToken">A token to observe for cancellation between users.</param>
+        </member>
+        <member name="T:Cinora.Infrastructure.Migrations.InitialCreate">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.InitialCreate.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.InitialCreate.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.InitialCreate.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Migrations.ReviewListIndex">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.ReviewListIndex.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.ReviewListIndex.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.ReviewListIndex.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Migrations.FriendLookupIndexes">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.FriendLookupIndexes.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.FriendLookupIndexes.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.FriendLookupIndexes.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Migrations.FeedIndex">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.FeedIndex.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.FeedIndex.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.FeedIndex.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Migrations.NotificationInboxIndex">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.NotificationInboxIndex.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.NotificationInboxIndex.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.NotificationInboxIndex.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Migrations.WatchlistPageIndexes">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.WatchlistPageIndexes.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.WatchlistPageIndexes.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.WatchlistPageIndexes.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Migrations.Phase6PushAndPreferences">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.Phase6PushAndPreferences.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.Phase6PushAndPreferences.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.Phase6PushAndPreferences.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Migrations.DisplayNameHandleAndDefaultLanguage">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.DisplayNameHandleAndDefaultLanguage.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.DisplayNameHandleAndDefaultLanguage.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.DisplayNameHandleAndDefaultLanguage.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Migrations.AddUserBlock">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.AddUserBlock.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.AddUserBlock.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.AddUserBlock.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Migrations.AddChat">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.AddChat.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.AddChat.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.AddChat.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Migrations.AddDataProtectionKeys">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.AddDataProtectionKeys.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.AddDataProtectionKeys.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.AddDataProtectionKeys.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Migrations.AddChatMovieShare">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.AddChatMovieShare.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.AddChatMovieShare.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.AddChatMovieShare.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Options.AdminDashboardOptions">
+            <summary>
+            Binds the <c>AdminDashboard</c> configuration section describing who may reach the admin-gated Hangfire
+            <c>/jobs</c> dashboard (Milestone 5.3, ADR 0018 §5). Infrastructure-owned (like all Options); the values reach
+            the Web-layer <c>AdminDashboardAuthorizationFilter</c> via the resolved options at <c>MapHangfireDashboard</c>
+            time. Bound with <c>ValidateUsingDataAnnotations().ValidateOnStart()</c> — the dashboard is a real attack
+            surface, so its access configuration is validated at boot.
+            <para>
+            <b>Fail-closed by default.</b> Out of the box <see cref="P:Cinora.Infrastructure.Options.AdminDashboardOptions.AdminAccounts"/> is empty and
+            <see cref="P:Cinora.Infrastructure.Options.AdminDashboardOptions.AllowAnyAuthenticatedInDevelopment"/> is <see langword="false"/>, so — in every environment,
+            including Production — the authorization filter denies <em>every</em> caller (anonymous and authenticated
+            alike) until an operator explicitly opts specific accounts in via configuration.
+            </para>
+            </summary>
+        </member>
+        <member name="F:Cinora.Infrastructure.Options.AdminDashboardOptions.SectionName">
+            <summary>The configuration section name bound to this options type.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.AdminDashboardOptions.AdminAccounts">
+            <summary>
+            The allow-list of account identifiers permitted to reach the Hangfire dashboard. Each entry is a
+            <b>server-assigned user-id GUID</b> (the unforgeable, preferred form) or an <b>email</b> — never a free-form
+            name claim. Matched case-insensitively. Empty (the default) means <em>no</em> admins — everyone is denied.
+            (Config key was <c>AdminEmails</c> before Milestone 5.3's L1/L2 hardening — the match is now user-id/email.)
+            </summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.AdminDashboardOptions.AllowAnyAuthenticatedInDevelopment">
+            <summary>
+            When <see langword="true"/>, ANY authenticated user may reach the dashboard — but ONLY in the
+            <c>Development</c> environment (never <c>Testing</c> or <c>Production</c>). A local-dev convenience;
+            defaults to <see langword="false"/> so it never loosens a deployed environment.
+            </summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Options.AiOptions">
+            <summary>
+            Binds the <c>Ai</c> configuration section describing the free, local Large Language Model used for
+            movie recommendations. The default provider is Ollama (native Windows, no API key, no rate limits),
+            exposed through its OpenAI-compatible <c>/v1</c> endpoint — this is deliberately NOT the paid OpenAI
+            API (CLAUDE.md free-only constraint). The <c>IRecommendationEngine</c> port keeps the provider
+            swappable. Bound with <c>ValidateDataAnnotations</c> (lazy) but NOT <c>ValidateOnStart</c> in Phase 1;
+            the consuming client (via Microsoft.Extensions.AI) arrives in Phase 5 (solution-structure.md §6).
+            </summary>
+        </member>
+        <member name="F:Cinora.Infrastructure.Options.AiOptions.SectionName">
+            <summary>The configuration section name bound to this options type.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.AiOptions.Provider">
+            <summary>
+            The LLM provider name. Defaults to <c>"Ollama"</c> (free, local). Selects which adapter the
+            <c>IRecommendationEngine</c> implementation resolves in the phase that consumes it.
+            </summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.AiOptions.Endpoint">
+            <summary>
+            The OpenAI-compatible chat-completions endpoint. Defaults to the local Ollama <c>/v1</c> API.
+            </summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.AiOptions.Model">
+            <summary>The model identifier to request from the provider (e.g. a locally pulled Ollama model).</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.AiOptions.ApiKey">
+            <summary>
+            The credential sent to the OpenAI-compatible provider. Local Ollama needs no key and ignores this, so it
+            defaults to the harmless placeholder <c>"ollama"</c>; a free-tier cloud provider (Groq, or Google Gemini's
+            OpenAI-compatible endpoint) is enabled by setting this to a real free key alongside <see cref="P:Cinora.Infrastructure.Options.AiOptions.Endpoint"/>
+            and <see cref="P:Cinora.Infrastructure.Options.AiOptions.Model"/> — with no code change (ADR 0016). Kept out of <c>appsettings.json</c>; supply it via
+            user-secrets (dev) or an environment variable (deploy). Required non-empty so a blank key fails fast at boot.
+            </summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.AiOptions.TimeoutSeconds">
+            <summary>The per-request timeout, in seconds, for LLM calls.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.AiOptions.MaxOutputTokens">
+            <summary>The maximum number of tokens the model may generate in a single completion.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Options.CacheOptions">
+            <summary>
+            Binds the <c>Cache</c> configuration section describing the caching backend behind the
+            <c>IDistributedCache</c> abstraction. The free default provider is <c>"Memory"</c>
+            (<c>AddDistributedMemoryCache</c>, in-process, no dependencies); a Redis-compatible server such as
+            Memurai Developer is optional and only engaged when <see cref="P:Cinora.Infrastructure.Options.CacheOptions.Provider"/> is set to Redis, in which
+            case <see cref="P:Cinora.Infrastructure.Options.CacheOptions.RedisConnectionString"/> supplies the connection (CLAUDE.md free-only constraint).
+            Bound with <c>ValidateDataAnnotations</c> (lazy) but NOT <c>ValidateOnStart</c> in Phase 1; caching
+            wiring that consumes these values arrives in a later phase (solution-structure.md §6).
+            </summary>
+        </member>
+        <member name="F:Cinora.Infrastructure.Options.CacheOptions.SectionName">
+            <summary>The configuration section name bound to this options type.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.CacheOptions.Provider">
+            <summary>
+            The cache provider name. Defaults to <c>"Memory"</c> (free, in-process). Set to a Redis-compatible
+            provider (e.g. Memurai) to use a distributed cache; <see cref="P:Cinora.Infrastructure.Options.CacheOptions.RedisConnectionString"/> is then required.
+            </summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.CacheOptions.RedisConnectionString">
+            <summary>
+            The connection string for the Redis-compatible server. Optional — only read when
+            <see cref="P:Cinora.Infrastructure.Options.CacheOptions.Provider"/> selects Redis; ignored (and typically absent) for the in-memory default.
+            </summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.CacheOptions.DefaultTtlSeconds">
+            <summary>The default cache entry time-to-live, in seconds, applied when a caller does not specify one.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Options.EmailOptions">
+            <summary>
+            Binds the <c>Email</c> configuration section — the SMTP mailer used for the password-reset link. The key names
+            mirror the sibling app so the same Gmail App-Password setup carries over. It defaults to <b>disabled</b>: with
+            <see cref="P:Cinora.Infrastructure.Options.EmailOptions.Enabled"/> false (or a blank <see cref="P:Cinora.Infrastructure.Options.EmailOptions.User"/>/<see cref="P:Cinora.Infrastructure.Options.EmailOptions.Password"/>) the adapter no-ops and logs,
+            so the app boots and the forgot-password flow degrades gracefully. <see cref="P:Cinora.Infrastructure.Options.EmailOptions.Password"/> is a secret — supply
+            it via user-secrets (dev) or an environment variable (deploy), NEVER <c>appsettings.json</c>. Bound with
+            <c>ValidateUsingDataAnnotations</c> (lazy) but NOT <c>ValidateOnStart</c>, since the feature is optional.
+            </summary>
+        </member>
+        <member name="F:Cinora.Infrastructure.Options.EmailOptions.SectionName">
+            <summary>The configuration section name bound to this options type.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.EmailOptions.Enabled">
+            <summary>Master switch. When false the mailer no-ops (and logs) — the app runs without email.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.EmailOptions.Host">
+            <summary>The SMTP host. Defaults to Gmail's submission host.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.EmailOptions.Port">
+            <summary>The SMTP submission port (587 = STARTTLS).</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.EmailOptions.User">
+            <summary>The SMTP account/user (e.g. the Gmail address). Secret-ish — keep out of appsettings.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.EmailOptions.Password">
+            <summary>The SMTP password (a Gmail 16-char App Password). SECRET — user-secrets / env var only.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.EmailOptions.FromAddress">
+            <summary>The From address; defaults to <see cref="P:Cinora.Infrastructure.Options.EmailOptions.User"/> when blank.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.EmailOptions.FromName">
+            <summary>The friendly From name shown in mail clients.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.EmailOptions.IsConfigured">
+            <summary>True only when the mailer is switched on and has both a user and a password.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Options.FileStorageOptions">
+            <summary>
+            Binds the <c>FileStorage</c> configuration section describing where user-uploaded media (avatars,
+            poster overrides) is stored behind the <c>IFileStorage</c> port. The free default provider is
+            <c>"Local"</c> — the local filesystem under <see cref="P:Cinora.Infrastructure.Options.FileStorageOptions.LocalRootPath"/>, served publicly at
+            <see cref="P:Cinora.Infrastructure.Options.FileStorageOptions.PublicBasePath"/>; the Azurite emulator is an optional dev alternative and Azure Blob a
+            future paid swap-in (CLAUDE.md free-only constraint). Upload guardrails (<see cref="P:Cinora.Infrastructure.Options.FileStorageOptions.MaxUploadBytes"/>
+            and <see cref="P:Cinora.Infrastructure.Options.FileStorageOptions.AllowedContentTypes"/>) live here so validators can enforce them. Bound with
+            <c>ValidateDataAnnotations</c> (lazy) but NOT <c>ValidateOnStart</c> in Phase 1; the consuming
+            <c>IFileStorage</c> implementation arrives in a later phase (solution-structure.md §6).
+            </summary>
+        </member>
+        <member name="F:Cinora.Infrastructure.Options.FileStorageOptions.SectionName">
+            <summary>The configuration section name bound to this options type.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.FileStorageOptions.Provider">
+            <summary>
+            The storage provider name. Defaults to <c>"Local"</c> (free local filesystem). Selects which
+            <c>IFileStorage</c> adapter the consuming phase resolves.
+            </summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.FileStorageOptions.LocalRootPath">
+            <summary>
+            The root path, relative to the content root, under which uploaded files are written for the local
+            provider. Kept outside <c>wwwroot</c> so writes are not directly web-servable without an explicit route.
+            </summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.FileStorageOptions.PublicBasePath">
+            <summary>
+            The public URL base path at which stored files are served to clients. Defaults to the shared
+            <see cref="F:Cinora.Infrastructure.Storage.AvatarServingRoute.PublicBasePath"/> (<c>/uploads</c>) so the minted-URL base and the
+            <c>MediaController</c> route have a single source of truth; an override that no longer targets that route
+            is a fail-fast boot error via <see cref="T:Cinora.Infrastructure.Options.FileStorageRouteValidateOptions"/> (ADR 0013 §2.4).
+            </summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.FileStorageOptions.MaxUploadBytes">
+            <summary>The maximum permitted upload size, in bytes. Defaults to roughly 5 MB.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.FileStorageOptions.AllowedContentTypes">
+            <summary>
+            The MIME content types accepted for uploads. Defaults to the common web image types
+            (JPEG, PNG, WebP). Uploads whose content type is not in this list are rejected by validation.
+            </summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.FileStorageOptions.UrlSigningKey">
+            <summary>
+            The HMAC-SHA256 key used to sign and verify the time-limited avatar-serving URLs (the SAS stand-in,
+            ADR 0013 §2.4). It is a SECRET: supplied via <c>dotnet user-secrets</c> / an environment variable
+            (<c>FileStorage:UrlSigningKey</c>) in Production — never committed to <c>appsettings*.json</c> — and
+            <b>required in Production</b> (enforced by <see cref="T:Cinora.Infrastructure.Options.FileStorageProductionValidateOptions"/> at boot).
+            In Development / Testing an ephemeral random key is auto-generated when this is blank, so local dev and
+            the test suite work without a configured secret (ephemeral tokens simply invalidate on restart). Not
+            annotated <c>[Required]</c> precisely because the blank-in-dev case is filled in by <c>PostConfigure</c>.
+            </summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.FileStorageOptions.SignedUrlBucketHours">
+            <summary>
+            The coarse expiry bucket, in hours, that avatar-serving URLs are rounded up to (ADR 0013 §2.4). A larger
+            bucket makes a key's URL byte-identical (and browser-cacheable) for longer, at the cost of a replaced
+            avatar remaining reachable via an old URL until the bucket rolls. Defaults to 24 hours.
+            </summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Options.FileStorageProductionValidateOptions">
+            <summary>
+            Fail-fast validation for the avatar URL-signing key (ADR 0013 §5): in <b>Production</b> the HMAC key that
+            gates who can mint avatar-serving URLs MUST be supplied via configuration
+            (<c>FileStorage:UrlSigningKey</c>, from user-secrets / environment), so a missing key aborts startup rather
+            than silently minting unverifiable URLs. In Development / Testing the key is auto-generated (an ephemeral
+            random key, wired in <c>AddInfrastructure</c>'s <c>PostConfigure</c>), so this validator only enforces the
+            Production requirement. Runs at boot because <see cref="T:Cinora.Infrastructure.Options.FileStorageOptions"/> is now
+            <c>ValidateOnStart</c>.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Options.FileStorageProductionValidateOptions.#ctor(Microsoft.Extensions.Hosting.IHostEnvironment)">
+            <summary>Initializes the validator with the host environment used to detect Production.</summary>
+            <param name="environment">The host environment.</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.Options.FileStorageProductionValidateOptions.Validate(System.String,Cinora.Infrastructure.Options.FileStorageOptions)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Options.FileStorageRouteValidateOptions">
+            <summary>
+            Fail-fast validation that the avatar <b>mint</b> side and <b>serve</b> side cannot silently drift (ADR 0013
+            §2.4). For the free <c>Local</c> provider the minted URL is built from
+            <see cref="P:Cinora.Infrastructure.Options.FileStorageOptions.PublicBasePath"/> (<c>LocalFileStorage.GetUrl</c>) while the bytes are served by
+            Web's <c>MediaController</c> at <see cref="F:Cinora.Infrastructure.Storage.AvatarServingRoute.RouteBase"/>. If an operator changes
+            <c>PublicBasePath</c> so it no longer targets that route, every minted avatar URL would <c>404</c> with NO
+            boot error. This validator turns that silent config drift into a loud boot failure; it runs under
+            <c>ValidateOnStart</c> alongside <see cref="T:Cinora.Infrastructure.Options.FileStorageProductionValidateOptions"/>. Only the local provider
+            is checked — a future Azure Blob adapter would mint a real SAS and not use the serving controller at all.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Options.FileStorageRouteValidateOptions.Validate(System.String,Cinora.Infrastructure.Options.FileStorageOptions)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Options.GoogleAuthOptions">
+            <summary>
+            Binds the <c>GoogleAuth</c> configuration section that supplies the Google OAuth client
+            credentials. Values come from user-secrets in development and environment variables / Key Vault
+            in production — never from committed <c>appsettings*.json</c>. When either credential is blank,
+            Google sign-in is left unconfigured so the application still boots and email/password login works
+            (solution-structure.md §6).
+            </summary>
+        </member>
+        <member name="F:Cinora.Infrastructure.Options.GoogleAuthOptions.SectionName">
+            <summary>The configuration section name bound to this options type.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.GoogleAuthOptions.ClientId">
+            <summary>The Google OAuth client id.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.GoogleAuthOptions.ClientSecret">
+            <summary>The Google OAuth client secret.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.GoogleAuthOptions.IsConfigured">
+            <summary>
+            Whether both credentials are present. When <c>false</c>, <c>AddGoogle</c> is not wired and only
+            email/password authentication is available.
+            </summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Options.OptionsValidationExtensions">
+            <summary>
+            A self-contained data-annotations validation hook for the Options pattern that adds no NuGet
+            dependency. The framework's <c>OptionsBuilder&lt;T&gt;.ValidateDataAnnotations()</c> lives in the
+            <c>Microsoft.Extensions.Options.DataAnnotations</c> assembly, which the Infrastructure class library
+            does not reference (it is part of the ASP.NET Core shared framework, not pulled transitively by
+            EF Core). Rather than add that package — Milestone 1.5 is deliberately dependency-free — this
+            registers an equivalent <see cref="T:Microsoft.Extensions.Options.IValidateOptions`1"/> built on the base-runtime
+            <see cref="T:System.ComponentModel.DataAnnotations.Validator"/>. Behaviour matches the framework: validation runs lazily on first access to
+            <c>IOptions&lt;T&gt;.Value</c>, and (with no <c>ValidateOnStart</c>) never at boot — so Phase 1 starts
+            even while unconsumed secrets such as the TMDB API key are absent (solution-structure.md §6).
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Options.OptionsValidationExtensions.ValidateUsingDataAnnotations``1(Microsoft.Extensions.Options.OptionsBuilder{``0})">
+            <summary>
+            Registers a data-annotations validator for <typeparamref name="TOptions"/> that evaluates the
+            options instance lazily on first access. The in-house, package-free equivalent of the framework's
+            <c>ValidateDataAnnotations()</c>; call <c>BindConfiguration(...)</c> before it.
+            </summary>
+            <typeparam name="TOptions">The options type being validated.</typeparam>
+            <param name="builder">The options builder to attach validation to.</param>
+            <returns>The same <paramref name="builder"/> instance, for chaining.</returns>
+        </member>
+        <member name="T:Cinora.Infrastructure.Options.DataAnnotationsValidateOptions`1">
+            <summary>
+            Validates an options instance against its <see cref="T:System.ComponentModel.DataAnnotations.ValidationAttribute"/> data annotations using the
+            base-runtime <see cref="T:System.ComponentModel.DataAnnotations.Validator"/>. Mirrors the framework's internal <c>DataAnnotationValidateOptions</c>
+            (including named-options scoping) without taking a dependency on its package.
+            </summary>
+            <typeparam name="TOptions">The options type being validated.</typeparam>
+        </member>
+        <member name="M:Cinora.Infrastructure.Options.DataAnnotationsValidateOptions`1.#ctor(System.String)">
+            <summary>Creates a validator scoped to the named options instance (empty string for the default).</summary>
+            <param name="name">The options name this validator applies to; <see langword="null"/> validates all names.</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.Options.DataAnnotationsValidateOptions`1.Validate(System.String,`0)">
+            <summary>Validates the supplied options instance for the requested name.</summary>
+            <param name="name">The name of the options instance being validated.</param>
+            <param name="options">The options instance to validate.</param>
+            <returns>The validation result — success, skip (name mismatch), or failure with member messages.</returns>
+        </member>
+        <member name="T:Cinora.Infrastructure.Options.RecommendationOptions">
+            <summary>
+            Binds the <c>Recommendations</c> configuration section describing the caps that bound the AI recommendation
+            pipeline — profile sizes, the candidate-pool size, the served-result count, and the reason length (Phase 5
+            design §8, ADR 0017). Infrastructure-owned (like all Options); the caps reach the Application seams through
+            the <c>IRecommendationPolicy</c> port (implemented by <c>RecommendationPolicy</c>) so the Application never
+            references this type — the same dependency-rule pattern as <c>FileStorageOptions</c>/<c>IUploadPolicy</c>
+            (ADR 0001/0013). Bound with <c>ValidateUsingDataAnnotations().ValidateOnStart()</c> in Phase 5 (first
+            consumer), so an out-of-range cap fails fast at boot.
+            </summary>
+        </member>
+        <member name="F:Cinora.Infrastructure.Options.RecommendationOptions.SectionName">
+            <summary>The configuration section name bound to this options type.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.RecommendationOptions.MaxTopRated">
+            <summary>The maximum number of the user's highest-rated titles carried into the taste profile.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.RecommendationOptions.MaxWatchlistTitles">
+            <summary>The maximum number of watchlist titles carried into the taste profile.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.RecommendationOptions.MaxFavoriteGenres">
+            <summary>The maximum number of favorite genres carried into the taste profile and the discover fan-out.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.RecommendationOptions.MaxRecommendationSeeds">
+            <summary>The maximum number of top-rated titles used to seed the "more like this" recommendation fan-out.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.RecommendationOptions.MaxCandidates">
+            <summary>The maximum size of the deduplicated, seen-excluded candidate pool offered to the engine.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.RecommendationOptions.MaxResults">
+            <summary>The maximum number of grounded picks kept in a served recommendation set.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.RecommendationOptions.MaxReasonLength">
+            <summary>The maximum length (in characters) of a pick's "why this" reason before it is truncated.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.RecommendationOptions.ServedCacheTtlHours">
+            <summary>
+            The time-to-live, in hours, of a served recommendation set in the distributed cache (Milestone 5.2, ADR
+            0018 §2). Defaults to 24 h — roughly one nightly-precompute refresh cycle — so a warmed set lives about one
+            cycle before it either expires to the durable history-row fallback or is overwritten by the next run.
+            </summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.RecommendationOptions.PrecomputeLookbackDays">
+            <summary>
+            The lookback window, in days, that bounds the nightly precompute's active-user scan (Milestone 5.3, Phase 5
+            design §10). Only users with review or watchlist activity within the last <c>PrecomputeLookbackDays</c> are
+            considered for regeneration, so the set-based selection reads — and the in-memory selection dictionaries —
+            stay bounded by recent activity rather than growing with all-time history. Defaults to 45 days.
+            </summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Options.TmdbOptions">
+            <summary>
+            Binds the <c>Tmdb</c> configuration section describing the free TMDB (The Movie Database) API used
+            for movie and series metadata. The <see cref="P:Cinora.Infrastructure.Options.TmdbOptions.ApiKey"/> is a secret supplied via user-secrets in
+            development and environment variables in production — never committed to <c>appsettings*.json</c>,
+            which carries only the non-secret <see cref="P:Cinora.Infrastructure.Options.TmdbOptions.BaseUrl"/> and <see cref="P:Cinora.Infrastructure.Options.TmdbOptions.ImageBaseUrl"/> defaults.
+            Bound with <c>ValidateDataAnnotations</c> (lazy) but deliberately NOT <c>ValidateOnStart</c> in
+            Phase 1 — nothing consumes TMDB yet, so a missing key must not fail application boot
+            (solution-structure.md §6). The typed <c>ITmdbClient</c> that consumes these values arrives in Phase 2.
+            </summary>
+        </member>
+        <member name="F:Cinora.Infrastructure.Options.TmdbOptions.SectionName">
+            <summary>The configuration section name bound to this options type.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.TmdbOptions.ApiKey">
+            <summary>
+            The TMDB API key (free, non-commercial tier). Supplied via user-secrets / environment variables,
+            never <c>appsettings*.json</c>. Required once TMDB is actually consumed (Phase 2).
+            </summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.TmdbOptions.BaseUrl">
+            <summary>The TMDB REST API base URL.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.TmdbOptions.ImageBaseUrl">
+            <summary>The TMDB image CDN base URL, used to build poster and backdrop URLs from image paths.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Options.WebPushOptions">
+            <summary>
+            Binds the <c>WebPush</c> configuration section carrying the self-generated VAPID credentials the
+            <c>WebPushSender</c> uses to send Web Push messages (Milestone 6.2, ADR 0020). All three fields are
+            <b>optional</b>: Web Push is strictly additive, so a deployer without VAPID keys still runs — push simply
+            stays OFF (<see cref="P:Cinora.Infrastructure.Options.WebPushOptions.IsConfigured"/> is <see langword="false"/>, the sender no-ops, and
+            <c>GET /push/public-key</c> reports unconfigured). The <b>private key is a secret</b> and MUST come from
+            user-secrets / environment variables — <b>never</b> <c>appsettings.*.json</c> (the public key is non-secret
+            and may live in appsettings). Bound with <see cref="M:Cinora.Infrastructure.Options.OptionsValidationExtensions.ValidateUsingDataAnnotations``1(Microsoft.Extensions.Options.OptionsBuilder{``0})"/>
+            (lazy) so a malformed value that IS present fails; it is deliberately <b>not</b> hard-<c>ValidateOnStart</c>-ed
+            on missing keys — an absent VAPID configuration degrades push to off, it does not crash boot (design §8).
+            </summary>
+        </member>
+        <member name="F:Cinora.Infrastructure.Options.WebPushOptions.SectionName">
+            <summary>The configuration section name bound to this options type.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.WebPushOptions.Subject">
+            <summary>
+            The VAPID subject — a <c>mailto:</c> address or an <c>https://</c> origin URL identifying the sender, as
+            required by RFC 8292. Optional (push off when absent); validated for shape only when present.
+            </summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.WebPushOptions.PublicKey">
+            <summary>
+            The VAPID public key (URL-safe base64). Non-secret — it is served to the browser at
+            <c>GET /push/public-key</c> and passed as the subscription's <c>applicationServerKey</c>. Optional.
+            </summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.WebPushOptions.PrivateKey">
+            <summary>
+            The VAPID private key (URL-safe base64). <b>Secret</b> — user-secrets / environment only, never
+            appsettings. Optional; validated for shape only when present. Never logged.
+            </summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Options.WebPushOptions.IsConfigured">
+            <summary>
+            Whether a complete VAPID credential set is present (subject + public + private key). When
+            <see langword="false"/>, Web Push is OFF: the sender no-ops and the subscribe UI stays hidden — the app
+            still delivers in-app notifications (inbox + SignalR), so nothing breaks without push (degrade-if-absent).
+            </summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.CinoraDbContext">
+            <summary>
+            The single EF Core context for Cinora. It derives from
+            <see cref="T:Microsoft.AspNetCore.Identity.EntityFrameworkCore.IdentityDbContext`3"/> so ASP.NET Identity and the domain schema
+            share one database and one transaction (registration creates the Identity principal and the
+            domain <see cref="T:Cinora.Domain.Entities.User"/> atomically — ADR 0003), and it implements <see cref="T:Cinora.Application.Common.Interfaces.IAppDbContext"/>
+            so the Application layer works against domain types only.
+            </summary>
+            <remarks>
+            The inherited Identity <c>Users</c> property is a <see cref="T:Microsoft.EntityFrameworkCore.DbSet`1"/>; the
+            domain user set is therefore exposed through the <see cref="P:Cinora.Application.Common.Interfaces.IAppDbContext.Users"/> explicit
+            interface implementation to avoid hiding it. All entity mappings live in
+            <c>Persistence/Configurations</c> and are applied by assembly scan.
+            </remarks>
+        </member>
+        <member name="M:Cinora.Infrastructure.Persistence.CinoraDbContext.#ctor(Microsoft.EntityFrameworkCore.DbContextOptions{Cinora.Infrastructure.Persistence.CinoraDbContext})">
+            <summary>Initializes a new instance of the <see cref="T:Cinora.Infrastructure.Persistence.CinoraDbContext"/> class.</summary>
+            <param name="options">The context options configured by the composition root (provider and connection string).</param>
+        </member>
+        <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.Friends">
+            <summary>The directed friendship graph between users.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.UserBlocks">
+            <summary>The directed user-block graph (existence = blocked; §2).</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.Conversations">
+            <summary>The chat conversations (1:1 + group).</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.ConversationMembers">
+            <summary>The membership rows linking users to conversations.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.Messages">
+            <summary>The chat messages.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.Movies">
+            <summary>The catalogue of movies and series cached from TMDB.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.Genres">
+            <summary>The TMDB genres titles can be tagged with.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.MovieGenres">
+            <summary>The many-to-many links between movies and genres.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.Reviews">
+            <summary>The user reviews of titles.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.ReviewLikes">
+            <summary>The likes recorded against reviews.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.Comments">
+            <summary>The comments recorded against reviews.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.Watchlists">
+            <summary>The users' watchlist entries.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.Notifications">
+            <summary>The in-app notifications delivered to users.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.Devices">
+            <summary>The registered Web Push device subscriptions.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.AIRecommendationHistories">
+            <summary>The audit history of AI recommendation generations.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.DataProtectionKeys">
+            <summary>The ASP.NET Data-Protection key ring, persisted here so the auth cookie + anti-forgery tokens
+            survive app restarts/redeploys (a regenerated key ring silently logs everyone out).</summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Persistence.CinoraDbContext.DiscardPendingChanges">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Persistence.CinoraDbContext.OnModelCreating(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.CinoraDbContextFactory">
+            <summary>
+            Design-time factory used by the <c>dotnet ef</c> tools to construct a <see cref="T:Cinora.Infrastructure.Persistence.CinoraDbContext"/>
+            outside the application host (no DI, no <c>Program.cs</c>). It points at the same local SQL Server
+            instance the app uses in Development so <c>migrations add</c>/<c>database update</c> work reliably.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Persistence.CinoraDbContextFactory.CreateDbContext(System.String[])">
+            <summary>Creates a <see cref="T:Cinora.Infrastructure.Persistence.CinoraDbContext"/> for design-time tooling.</summary>
+            <param name="args">Command-line arguments passed by the EF tools (unused).</param>
+            <returns>A context configured against the local development database.</returns>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.Configurations.AIRecommendationHistoryConfiguration">
+            <summary>Maps the <see cref="T:Cinora.Domain.Entities.AIRecommendationHistory"/> audit entity.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.Configurations.CommentConfiguration">
+            <summary>Maps the <see cref="T:Cinora.Domain.Entities.Comment"/> entity on a review.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.Configurations.ConversationConfiguration">
+            <summary>Maps the <see cref="T:Cinora.Domain.Entities.Conversation"/> aggregate (§11).</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.Configurations.ConversationMemberConfiguration">
+            <summary>Maps <see cref="T:Cinora.Domain.Entities.ConversationMember"/> — one row per (conversation, user) (§11).</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.Configurations.DeviceConfiguration">
+            <summary>Maps the <see cref="T:Cinora.Domain.Entities.Device"/> Web Push subscription entity.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.Configurations.FriendConfiguration">
+            <summary>Maps the self-referencing <see cref="T:Cinora.Domain.Entities.Friend"/> relationship between two users.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.Configurations.GenreConfiguration">
+            <summary>Maps the <see cref="T:Cinora.Domain.Entities.Genre"/> reference entity and seeds the static TMDB genre list.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.Configurations.GenreSeedData">
+            <summary>
+            The static TMDB genre reference data seeded via <c>HasData</c>. It is the union of TMDB's movie
+            and TV genre lists (Cinora catalogues both), keyed by hardcoded, deterministic <see cref="T:System.Guid"/>s
+            so migration snapshots stay stable across runs. Each id embeds the TMDB genre id in its first
+            segment for readability (for example genre 28 → <c>00000028-...</c>); the domain
+            <c>Genre.TmdbGenreId</c> unique index guarantees no duplicate TMDB ids.
+            </summary>
+        </member>
+        <member name="F:Cinora.Infrastructure.Persistence.Configurations.GenreSeedData.Genres">
+            <summary>The seed rows as anonymous objects (the domain <c>Genre</c> has a private constructor).</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.Configurations.MessageConfiguration">
+            <summary>Maps <see cref="T:Cinora.Domain.Entities.Message"/> with the history keyset index (§11).</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.Configurations.MovieConfiguration">
+            <summary>Maps the <see cref="T:Cinora.Domain.Entities.Movie"/> catalogue entity cached from TMDB.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.Configurations.MovieGenreConfiguration">
+            <summary>Maps the <see cref="T:Cinora.Domain.Entities.MovieGenre"/> join with its composite (MovieId, GenreId) key.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.Configurations.NotificationConfiguration">
+            <summary>Maps the <see cref="T:Cinora.Domain.Entities.Notification"/> entity, including its two (recipient + optional actor) user FKs.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.Configurations.ReviewConfiguration">
+            <summary>Maps the <see cref="T:Cinora.Domain.Entities.Review"/> aggregate, including the <see cref="T:Cinora.Domain.ValueObjects.Rating"/> conversion and its guard rail.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.Configurations.ReviewLikeConfiguration">
+            <summary>Maps the <see cref="T:Cinora.Domain.Entities.ReviewLike"/> join with its composite (ReviewId, UserId) key.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.Configurations.UserBlockConfiguration">
+            <summary>Maps the directed <see cref="T:Cinora.Domain.Entities.UserBlock"/> relationship between two users (§2, §11).</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.Configurations.UserConfiguration">
+            <summary>Maps the domain <see cref="T:Cinora.Domain.Entities.User"/> aggregate and its shared-PK 1:1 with the Identity principal.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.Configurations.WatchlistConfiguration">
+            <summary>Maps the <see cref="T:Cinora.Domain.Entities.Watchlist"/> entry entity.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Push.InlinePushDispatch">
+            <summary>
+            The free, no-Hangfire <see cref="T:Cinora.Application.Common.Interfaces.IPushDispatch"/> adapter that ships now (ADR 0020 §3.4): it runs the Web Push
+            fan-out on a background <see cref="T:System.Threading.Tasks.Task"/> in its <b>own</b> DI scope, so the send is <b>off the request
+            thread</b> and never touches the request's about-to-be-disposed scope. <see cref="M:Cinora.Infrastructure.Push.InlinePushDispatch.Enqueue(System.Guid)"/> returns
+            immediately and the send is <b>fire-and-forget best-effort</b> — a bounded timeout caps a slow push service,
+            and every fault (including the timeout) is caught and logged, so a push failure can never surface as an
+            unobserved task exception nor affect the already-committed write (the inbox is authoritative; N2/ADR 0011).
+            A durable, retried <c>HangfirePushDispatch</c> is the documented drop-in when a queue is wanted; swapping the
+            DI registration is the only change (the port stays).
+            </summary>
+            <param name="scopeFactory">Creates a fresh DI scope per dispatch so each send gets a clean, isolated context.</param>
+            <param name="logger">Records a Warning when a best-effort dispatch fails.</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.Push.InlinePushDispatch.#ctor(Microsoft.Extensions.DependencyInjection.IServiceScopeFactory,Microsoft.Extensions.Logging.ILogger{Cinora.Infrastructure.Push.InlinePushDispatch})">
+            <summary>
+            The free, no-Hangfire <see cref="T:Cinora.Application.Common.Interfaces.IPushDispatch"/> adapter that ships now (ADR 0020 §3.4): it runs the Web Push
+            fan-out on a background <see cref="T:System.Threading.Tasks.Task"/> in its <b>own</b> DI scope, so the send is <b>off the request
+            thread</b> and never touches the request's about-to-be-disposed scope. <see cref="M:Cinora.Infrastructure.Push.InlinePushDispatch.Enqueue(System.Guid)"/> returns
+            immediately and the send is <b>fire-and-forget best-effort</b> — a bounded timeout caps a slow push service,
+            and every fault (including the timeout) is caught and logged, so a push failure can never surface as an
+            unobserved task exception nor affect the already-committed write (the inbox is authoritative; N2/ADR 0011).
+            A durable, retried <c>HangfirePushDispatch</c> is the documented drop-in when a queue is wanted; swapping the
+            DI registration is the only change (the port stays).
+            </summary>
+            <param name="scopeFactory">Creates a fresh DI scope per dispatch so each send gets a clean, isolated context.</param>
+            <param name="logger">Records a Warning when a best-effort dispatch fails.</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.Push.InlinePushDispatch.Enqueue(System.Guid)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Push.InlinePushDispatch.EnqueueChatMessage(System.Guid)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Push.InlinePushDispatch.LogDispatchFailed(Microsoft.Extensions.Logging.ILogger,System.Exception,System.Guid)">
+            <summary>
+            Logs "Best-effort Web Push dispatch for notification {NotificationId} failed; the notification is already committed and remains in the recipient's inbox." at "Warning" level.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Push.InlinePushDispatch.LogChatDispatchFailed(Microsoft.Extensions.Logging.ILogger,System.Exception,System.Guid)">
+            <summary>
+            Logs "Best-effort chat Web Push dispatch for message {MessageId} failed; the message is already committed and the in-app conversation is unaffected." at "Warning" level.
+            </summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Push.WebPushSender">
+            <summary>
+            The <see cref="T:Cinora.Application.Common.Interfaces.IPushSender"/> adapter over the free, MIT WebPush library + self-generated VAPID (ADR 0020
+            §3.2). It maps the Application-owned <see cref="T:Cinora.Application.Common.Push.PushSubscription"/>/<see cref="T:Cinora.Application.Common.Push.PushPayload"/> to the library's
+            types <b>internally</b> — the vendor type never crosses back over the port — serializes the payload to JSON
+            (the shape the service worker's <c>push</c> handler reads: <c>title</c>/<c>body</c>/<c>url</c>/<c>tag</c>),
+            and sends over RFC 8291/8292. VAPID material comes from bound <see cref="T:Cinora.Infrastructure.Options.WebPushOptions"/> (never
+            <c>IConfiguration</c>; the private key is a secret and is <b>never logged</b>). It is <b>degrade-if-absent</b>:
+            with no VAPID keys configured it returns <see cref="F:Cinora.Application.Common.Push.PushSendResult.TransientFailure"/> without a network call
+            (push is simply off). One <see cref="T:WebPush.WebPushClient"/> (and its inner <c>HttpClient</c>) is reused for the app
+            lifetime — registered as a singleton, disposed at shutdown.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Push.WebPushSender.#ctor(Microsoft.Extensions.Options.IOptions{Cinora.Infrastructure.Options.WebPushOptions},Microsoft.Extensions.Logging.ILogger{Cinora.Infrastructure.Push.WebPushSender})">
+            <summary>Creates the sender over the bound VAPID options and a reusable WebPush client.</summary>
+            <param name="options">The bound VAPID credentials (subject + public/private key).</param>
+            <param name="logger">Logs a disabled/degraded send; never logs key material.</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.Push.WebPushSender.SendAsync(Cinora.Application.Common.Push.PushSubscription,Cinora.Application.Common.Push.PushPayload,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Push.WebPushSender.Classify(System.Net.HttpStatusCode)">
+            <summary>Maps a push-service HTTP status to a send result: 404/410 prune the subscription, anything else is transient.</summary>
+            <param name="statusCode">The status the push service returned (via <c>WebPushException.StatusCode</c>).</param>
+            <returns><see cref="F:Cinora.Application.Common.Push.PushSendResult.Gone"/> for 404/410; otherwise <see cref="F:Cinora.Application.Common.Push.PushSendResult.TransientFailure"/>.</returns>
+        </member>
+        <member name="M:Cinora.Infrastructure.Push.WebPushSender.Dispose">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Push.WebPushSender.LogPushDisabled(Microsoft.Extensions.Logging.ILogger)">
+            <summary>
+            Logs "Web Push is not configured (no VAPID keys); skipping the send (push disabled)." at "Debug" level.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Push.WebPushSender.LogSendFailed(Microsoft.Extensions.Logging.ILogger,System.Int32,System.String)">
+            <summary>
+            Logs "Web Push send failed with status {StatusCode}; classified as {Result}." at "Warning" level.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Push.WebPushSender.LogSendErrored(Microsoft.Extensions.Logging.ILogger,System.Exception)">
+            <summary>
+            Logs "Web Push send errored transiently." at "Warning" level.
+            </summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Storage.AvatarPaths">
+            <summary>
+            Resolves the on-disk location of avatar files (ADR 0013 §2.2). The upload root is
+            <see cref="P:Cinora.Infrastructure.Options.FileStorageOptions.LocalRootPath"/> resolved relative to the host content root, deliberately
+            <b>OUTSIDE <c>wwwroot</c></b> so nothing under it is web-servable except through the token-gated media
+            controller. <see cref="M:Cinora.Infrastructure.Storage.AvatarPaths.TryResolveFile(System.String,System.String,System.String@)"/> combines the root with a storage key and performs a canonical
+            containment check as defense-in-depth: even though the key grammar (<see cref="T:Cinora.Infrastructure.Storage.AvatarStorageKey"/>) makes
+            <c>..</c> impossible, any resolved path that escapes the root is rejected rather than followed.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.AvatarPaths.ResolveRoot(Microsoft.Extensions.Hosting.IHostEnvironment,Cinora.Infrastructure.Options.FileStorageOptions)">
+            <summary>
+            The absolute, canonical upload root: <c>{ContentRootPath}/{LocalRootPath}</c>. Callers create this
+            directory at startup and combine keys against it via <see cref="M:Cinora.Infrastructure.Storage.AvatarPaths.TryResolveFile(System.String,System.String,System.String@)"/>.
+            </summary>
+            <param name="environment">The host environment supplying the content root.</param>
+            <param name="options">The bound file-storage options supplying the relative root path.</param>
+            <returns>The absolute upload-root path.</returns>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.AvatarPaths.TryResolveFile(System.String,System.String,System.String@)">
+            <summary>
+            Resolves the absolute file path for a storage key under <paramref name="root"/>, validating the key
+            grammar and asserting the canonical result stays strictly inside the root.
+            </summary>
+            <param name="root">The absolute upload root (from <see cref="M:Cinora.Infrastructure.Storage.AvatarPaths.ResolveRoot(Microsoft.Extensions.Hosting.IHostEnvironment,Cinora.Infrastructure.Options.FileStorageOptions)"/>).</param>
+            <param name="storageKey">The storage key to resolve.</param>
+            <param name="fullPath">The absolute file path when the method returns <see langword="true"/>.</param>
+            <returns>
+            <see langword="true"/> when the key is well-formed and resolves inside the root; <see langword="false"/>
+            for a malformed / path-traversal-bearing key or any path that would escape the root.
+            </returns>
+        </member>
+        <member name="T:Cinora.Infrastructure.Storage.AvatarServingRoute">
+            <summary>
+            The single source of truth for the avatar-serving route base segment (ADR 0013 §2.4). The <b>mint</b> side
+            (<see cref="M:Cinora.Infrastructure.Storage.LocalFileStorage.GetUrl(System.String,System.TimeSpan)"/>, via <c>FileStorageOptions.PublicBasePath</c>) and the <b>serve</b>
+            side (Web's <c>MediaController</c> <c>[Route]</c>) must target the same path, but they live in different
+            layers and would otherwise agree only by convention — an operator changing <c>PublicBasePath</c> would then
+            silently point every minted avatar URL at a route the controller does not serve (all avatars 404, no boot
+            error). Both sides reference this const, and <c>FileStorageRouteValidateOptions</c> asserts they still line up
+            at boot, so the coupling is explicit and cannot silently drift.
+            </summary>
+        </member>
+        <member name="F:Cinora.Infrastructure.Storage.AvatarServingRoute.RouteBase">
+            <summary>
+            The route base segment (no leading slash) the media controller serves avatars under: <c>uploads</c>.
+            Referenced by the <c>MediaController</c> <c>[Route]</c> attribute (which requires a compile-time constant).
+            </summary>
+        </member>
+        <member name="F:Cinora.Infrastructure.Storage.AvatarServingRoute.PublicBasePath">
+            <summary>
+            The public URL base path a minted avatar URL must target — <c>/uploads</c> — i.e. a leading slash plus
+            <see cref="F:Cinora.Infrastructure.Storage.AvatarServingRoute.RouteBase"/>. Used as the default for <c>FileStorageOptions.PublicBasePath</c> and by the
+            boot-time route-consistency validator.
+            </summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Storage.AvatarStorageKey">
+            <summary>
+            The single authority on avatar storage-key shape (ADR 0013 §2.2). A key is <b>server-generated</b> as
+            <c>avatars/{32-hex}{ext}</c> where the extension comes from the magic-byte-confirmed type — never the client
+            filename or declared content-type — so there is no user-controlled path component and path traversal is
+            impossible by construction. Read/delete/serve paths additionally re-validate any key against
+            <see cref="M:Cinora.Infrastructure.Storage.AvatarStorageKey.KeyPattern"/> as defense-in-depth. Also maps the confirmed format to its extension and the
+            stored extension back to the forced serving content-type.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.AvatarStorageKey.KeyPattern">
+            <remarks>
+            Pattern:<br/>
+            <code>^avatars/[0-9a-f]{32}\\.(jpg|png|webp)\\z</code><br/>
+            Options:<br/>
+            <code>RegexOptions.CultureInvariant</code><br/>
+            Explanation:<br/>
+            <code>
+            ○ Match if at the beginning of the string.<br/>
+            ○ Match the string "avatars/".<br/>
+            ○ Match a lowercase hexadecimal digit exactly 32 times.<br/>
+            ○ Match '.'.<br/>
+            ○ 1st capture group.<br/>
+                ○ Match with 3 alternative expressions.<br/>
+                    ○ Match the string "jpg".<br/>
+                    ○ Match the string "png".<br/>
+                    ○ Match the string "webp".<br/>
+            ○ Match if at the end of the string.<br/>
+            </code>
+            </remarks>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.AvatarStorageKey.New(Cinora.Infrastructure.Storage.ImageFormat)">
+            <summary>
+            Mints a fresh, server-owned key for a confirmed image format. The random 32-hex component makes the key
+            unguessable and collision-free; the extension is derived from <paramref name="format"/> (the confirmed
+            type), not from any client input.
+            </summary>
+            <param name="format">The magic-byte-confirmed image format.</param>
+            <returns>A new key of the form <c>avatars/{32-hex}{ext}</c>.</returns>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.AvatarStorageKey.IsValid(System.String)">
+            <summary>Whether <paramref name="key"/> matches the strict avatar-key grammar.</summary>
+            <param name="key">The candidate storage key.</param>
+            <returns><see langword="true"/> for a well-formed avatar key; otherwise <see langword="false"/>.</returns>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.AvatarStorageKey.Extension(Cinora.Infrastructure.Storage.ImageFormat)">
+            <summary>The file extension (including the dot) for a confirmed format.</summary>
+            <param name="format">The confirmed image format.</param>
+            <returns><c>.jpg</c>, <c>.png</c>, or <c>.webp</c>.</returns>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.AvatarStorageKey.ContentTypeForKey(System.String)">
+            <summary>
+            The content-type to force when serving a stored key. Because the extension was set from the confirmed
+            magic-byte type at save time, this is the file's TRUE type — served with <c>nosniff</c> so a crafted
+            polyglot cannot execute (ADR 0013 §2.4). The key is assumed valid (<see cref="M:Cinora.Infrastructure.Storage.AvatarStorageKey.IsValid(System.String)"/>).
+            </summary>
+            <param name="key">A valid avatar storage key.</param>
+            <returns>The forced <c>image/*</c> content-type.</returns>
+        </member>
+        <member name="T:Cinora.Infrastructure.Storage.AvatarUrlSigner">
+            <summary>
+            Mints and verifies the deterministic, time-limited avatar-serving token — the free local stand-in for a
+            Blob SAS (ADR 0013 §2.4). The token carries the storage key and a coarse <b>bucketed</b> expiry, signed with
+            an <b>HMAC-SHA256</b> over <c>{storageKey}|{expiryUnix}</c> using <see cref="P:Cinora.Infrastructure.Options.FileStorageOptions.UrlSigningKey"/>.
+            The HMAC is deterministic (unlike <c>ITimeLimitedDataProtector</c>), so a key's URL is byte-identical within
+            its bucket window and browser-cacheable across a feed, yet rotates and expires each bucket. A holder of a
+            token cannot forge a different key or a later expiry without the signing key. Time is read from an injected
+            <see cref="T:System.TimeProvider"/> so expiry is deterministically testable.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.AvatarUrlSigner.#ctor(Microsoft.Extensions.Options.IOptions{Cinora.Infrastructure.Options.FileStorageOptions},System.TimeProvider)">
+            <summary>Initializes the signer over the bound options and a time source.</summary>
+            <param name="options">The file-storage options supplying the signing key and bucket size.</param>
+            <param name="timeProvider">The clock used for minting and expiry checks (injectable for tests).</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.AvatarUrlSigner.CreateToken(System.String,System.TimeSpan)">
+            <summary>
+            Creates a signed token whose bucketed expiry is at least <paramref name="ttl"/> in the future. The
+            effective expiry is rounded UP to the next bucket boundary (<see cref="P:Cinora.Infrastructure.Options.FileStorageOptions.SignedUrlBucketHours"/>),
+            making the token byte-identical for every render whose <c>now + ttl</c> falls in the same bucket.
+            </summary>
+            <param name="storageKey">The (valid) storage key the token grants access to.</param>
+            <param name="ttl">The minimum validity window before the bucketed expiry.</param>
+            <returns>A URL-safe token of the form <c>base64url(payload).base64url(hmac)</c>.</returns>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.AvatarUrlSigner.TryValidateToken(System.String,System.String@)">
+            <summary>
+            Verifies a token: recomputes the HMAC in fixed time, rejects a signature mismatch or a past expiry, and
+            extracts the storage key. Returns <see langword="false"/> for any malformed, tampered, or expired token.
+            </summary>
+            <param name="token">The token from the query string.</param>
+            <param name="storageKey">The extracted storage key when the method returns <see langword="true"/>.</param>
+            <returns><see langword="true"/> for a valid, unexpired, untampered token; otherwise <see langword="false"/>.</returns>
+        </member>
+        <member name="T:Cinora.Infrastructure.Storage.IAvatarContentSource">
+            <summary>
+            The serving-side counterpart to the local <see cref="T:Cinora.Application.Common.Interfaces.IFileStorage"/>
+            minting path, consumed by the Web media controller (ADR 0013 §2.4). It verifies a serving token and RESOLVES
+            the referenced file to a physical path, forced true content-type, and a cheap conditional-GET validator —
+            keeping all token verification and path resolution inside Infrastructure so the controller stays thin. This
+            seam is <b>local-provider specific</b>: a future Azure Blob adapter would instead have
+            <see cref="M:Cinora.Application.Common.Interfaces.IFileStorage.GetUrl(System.String,System.TimeSpan)"/> return a real SAS and would not use a
+            serving controller at all, so this interface deliberately does not live on the Application port.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.IAvatarContentSource.TryResolve(System.String)">
+            <summary>
+            Verifies the serving token (HMAC + expiry + key grammar), then RESOLVES the referenced file WITHOUT
+            reading its bytes — it returns the physical path, the forced true content-type, and a cheap weak
+            validator (file length + last-write-time) derived from a single stat. The controller streams the path via
+            <c>PhysicalFileResult</c>, so a matching <c>If-None-Match</c> short-circuits to <c>304</c> BEFORE the file
+            is opened (Milestone 6.4 §6.3 — no per-GET read + rehash). Returns <see langword="null"/> — mapped to
+            <c>404</c> by the controller — for any invalid, tampered, or expired token, a malformed/traversal key, or
+            a missing file. Never trusts or echoes a client content-type/path.
+            </summary>
+            <param name="token">The opaque serving token from the request query string.</param>
+            <returns>The resolved avatar file, or <see langword="null"/> when it cannot be served.</returns>
+        </member>
+        <member name="T:Cinora.Infrastructure.Storage.AvatarFile">
+            <summary>
+            A verified avatar ready to serve: its absolute <paramref name="PhysicalPath"/> (under <c>App_Data/uploads</c>,
+            streamed through the token-gated controller — never static-served), the forced true
+            <paramref name="ContentType"/> (derived from the confirmed extension, served with <c>nosniff</c>), and a
+            cheap <b>weak</b> <paramref name="ETag"/> (<c>W/"length-lastWriteTicks"</c>) so a conditional GET can 304
+            before any file read. Weak because it is not a content hash — RFC 7232 weak comparison (which
+            <c>If-None-Match</c> uses) matches it correctly, and a byte change alters the length or the write time.
+            </summary>
+            <param name="PhysicalPath">The absolute on-disk path of the file to stream.</param>
+            <param name="ContentType">The forced <c>image/*</c> content-type to serve with <c>nosniff</c>.</param>
+            <param name="ETag">The weak validator ETag (<c>W/"length-lastWriteTicks"</c>).</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.AvatarFile.#ctor(System.String,System.String,System.String)">
+            <summary>
+            A verified avatar ready to serve: its absolute <paramref name="PhysicalPath"/> (under <c>App_Data/uploads</c>,
+            streamed through the token-gated controller — never static-served), the forced true
+            <paramref name="ContentType"/> (derived from the confirmed extension, served with <c>nosniff</c>), and a
+            cheap <b>weak</b> <paramref name="ETag"/> (<c>W/"length-lastWriteTicks"</c>) so a conditional GET can 304
+            before any file read. Weak because it is not a content hash — RFC 7232 weak comparison (which
+            <c>If-None-Match</c> uses) matches it correctly, and a byte change alters the length or the write time.
+            </summary>
+            <param name="PhysicalPath">The absolute on-disk path of the file to stream.</param>
+            <param name="ContentType">The forced <c>image/*</c> content-type to serve with <c>nosniff</c>.</param>
+            <param name="ETag">The weak validator ETag (<c>W/"length-lastWriteTicks"</c>).</param>
+        </member>
+        <member name="P:Cinora.Infrastructure.Storage.AvatarFile.PhysicalPath">
+            <summary>The absolute on-disk path of the file to stream.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Storage.AvatarFile.ContentType">
+            <summary>The forced <c>image/*</c> content-type to serve with <c>nosniff</c>.</summary>
+        </member>
+        <member name="P:Cinora.Infrastructure.Storage.AvatarFile.ETag">
+            <summary>The weak validator ETag (<c>W/"length-lastWriteTicks"</c>).</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Storage.ImageFormat">
+            <summary>
+            The image format confirmed by <see cref="T:Cinora.Infrastructure.Storage.ImageContentInspector"/> from a file's leading magic bytes. Only
+            the three web image types Cinora accepts are representable — everything else (SVG, GIF, HTML, arbitrary
+            binary) is undetectable and therefore rejected at the upload gate (ADR 0013 §2.3).
+            </summary>
+        </member>
+        <member name="F:Cinora.Infrastructure.Storage.ImageFormat.Jpeg">
+            <summary>JPEG — magic bytes <c>FF D8 FF</c>.</summary>
+        </member>
+        <member name="F:Cinora.Infrastructure.Storage.ImageFormat.Png">
+            <summary>PNG — magic bytes <c>89 50 4E 47 0D 0A 1A 0A</c>.</summary>
+        </member>
+        <member name="F:Cinora.Infrastructure.Storage.ImageFormat.Webp">
+            <summary>WebP — <c>RIFF</c>....<c>WEBP</c> container signature.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Storage.IImageContentInspector">
+            <summary>
+            Derives an upload's <b>true</b> image type from its leading magic bytes. Modeled as a port (like
+            <c>ITmdbImageUrlBuilder</c>) so the storage adapter depends on the abstraction and it is independently
+            registered/testable.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.IImageContentInspector.TryDetect(System.ReadOnlySpan{System.Byte},Cinora.Infrastructure.Storage.ImageFormat@)">
+            <summary>
+            Attempts to identify the image format from the supplied leading bytes.
+            </summary>
+            <param name="header">The file's leading bytes (up to <see cref="F:Cinora.Infrastructure.Storage.ImageContentInspector.RequiredHeaderBytes"/>).</param>
+            <param name="format">The detected format when the method returns <see langword="true"/>.</param>
+            <returns><see langword="true"/> when the bytes match JPEG, PNG, or WebP; otherwise <see langword="false"/>.</returns>
+        </member>
+        <member name="T:Cinora.Infrastructure.Storage.ImageContentInspector">
+            <summary>
+            Dependency-free magic-byte sniffer that derives an upload's <b>true</b> image type from its leading bytes,
+            so the declared content-type (attacker-controlled) is never trusted. This is Cinora's free defense against
+            content-type spoofing and image-as-XSS (SVG/polyglots) in place of a decode/re-encode library — whose
+            license is the same posture that banned MediatR/FluentAssertions (ADR 0013). A file whose bytes are not one
+            of JPEG/PNG/WebP is undetectable here and rejected by <see cref="M:Cinora.Infrastructure.Storage.LocalFileStorage.SaveAsync(System.IO.Stream,System.String,System.Threading.CancellationToken)"/>.
+            </summary>
+        </member>
+        <member name="F:Cinora.Infrastructure.Storage.ImageContentInspector.RequiredHeaderBytes">
+            <summary>
+            The number of leading bytes required to positively identify any supported format. WebP needs the most
+            (the 4-byte <c>RIFF</c> tag, a 4-byte size, then the 4-byte <c>WEBP</c> form-type at offset 8).
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.ImageContentInspector.TryDetect(System.ReadOnlySpan{System.Byte},Cinora.Infrastructure.Storage.ImageFormat@)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Storage.LocalFileStorage">
+            <summary>
+            The free local-filesystem realization of <see cref="T:Cinora.Application.Common.Interfaces.IFileStorage"/> and the authoritative avatar upload
+            gate (ADR 0013). Bytes are written under <see cref="P:Cinora.Infrastructure.Options.FileStorageOptions.LocalRootPath"/> resolved relative to
+            the content root, deliberately <b>outside <c>wwwroot</c></b>, using a server-generated key derived from the
+            magic-byte-confirmed type — the client filename and declared content-type are discarded, so path traversal
+            is impossible by construction. It also serves those bytes back (via <see cref="T:Cinora.Infrastructure.Storage.IAvatarContentSource"/>)
+            through the token-gated media controller. Registered as a singleton — it holds no per-request state.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.LocalFileStorage.SaveAsync(System.IO.Stream,System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.LocalFileStorage.GetUrl(System.String,System.TimeSpan)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.LocalFileStorage.DeleteAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.LocalFileStorage.TryResolve(System.String)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.LocalFileStorage.LogDeleteFailed(Microsoft.Extensions.Logging.ILogger,System.Exception,System.String)">
+            <summary>
+            Logs "Best-effort avatar delete failed for path {Path}; leaving an orphan file." at "Warning" level.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.LocalFileStorage.LogServeReadFailed(Microsoft.Extensions.Logging.ILogger,System.Exception,System.String)">
+            <summary>
+            Logs "Resolving avatar metadata failed for key {StorageKey}; serving 404." at "Warning" level.
+            </summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Storage.UploadPolicy">
+            <summary>
+            The Infrastructure implementation of <see cref="T:Cinora.Application.Common.Interfaces.IUploadPolicy"/> over <see cref="T:Cinora.Infrastructure.Options.FileStorageOptions"/>. It
+            exposes the size cap and content-type allow-list to the Application-layer avatar validator without the
+            Application referencing this Options type (the dependency rule, ADR 0013 §2.3). This is only the fast,
+            friendly pre-check against the DECLARED content-type; <see cref="M:Cinora.Application.Common.Interfaces.IFileStorage.SaveAsync(System.IO.Stream,System.String,System.Threading.CancellationToken)"/> remains the
+            authoritative magic-byte gate.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.UploadPolicy.#ctor(Microsoft.Extensions.Options.IOptions{Cinora.Infrastructure.Options.FileStorageOptions})">
+            <summary>Initializes the policy over the bound file-storage options.</summary>
+            <param name="options">The file-storage options supplying the cap and allow-list.</param>
+        </member>
+        <member name="P:Cinora.Infrastructure.Storage.UploadPolicy.MaxUploadBytes">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.UploadPolicy.IsAllowedContentType(System.String)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Storage.UploadStorageInitializer">
+            <summary>
+            Ensures the local upload root (<see cref="P:Cinora.Infrastructure.Options.FileStorageOptions.LocalRootPath"/>, outside <c>wwwroot</c>)
+            exists at application startup, so the first avatar upload does not fail on a missing folder (ADR 0013 §2.2).
+            A hosted service rather than lazy creation in the storage adapter keeps the pure, per-view
+            <see cref="M:Cinora.Application.Common.Interfaces.IFileStorage.GetUrl(System.String,System.TimeSpan)"/> path free of any filesystem I/O.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.UploadStorageInitializer.#ctor(Microsoft.Extensions.Hosting.IHostEnvironment,Microsoft.Extensions.Options.IOptions{Cinora.Infrastructure.Options.FileStorageOptions})">
+            <summary>Initializes the initializer with the host environment and bound options.</summary>
+            <param name="environment">The host environment supplying the content root.</param>
+            <param name="options">The bound file-storage options supplying the relative root path.</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.UploadStorageInitializer.StartAsync(System.Threading.CancellationToken)">
+            <summary>Creates the upload-root directory if it does not already exist.</summary>
+            <param name="cancellationToken">Unused — directory creation is synchronous and immediate.</param>
+            <returns>A completed task.</returns>
+        </member>
+        <member name="M:Cinora.Infrastructure.Storage.UploadStorageInitializer.StopAsync(System.Threading.CancellationToken)">
+            <summary>No-op on shutdown.</summary>
+            <param name="cancellationToken">Unused.</param>
+            <returns>A completed task.</returns>
+        </member>
+        <member name="T:Cinora.Infrastructure.Tmdb.CachedTmdbClient">
+            <summary>
+            A cache-aside decorator over the raw <see cref="T:Cinora.Infrastructure.Tmdb.TmdbClient"/> (ADR 0007). It wraps the inner
+            <see cref="T:Cinora.Application.Common.Interfaces.ITmdbClient"/> and, for every method, tries the free in-memory <see cref="T:Microsoft.Extensions.Caching.Distributed.IDistributedCache"/>
+            first (System.Text.Json round-trip of the Application read model), calls the inner client on a miss, then
+            stores the successful result under a stable <c>cinora:tmdb:*</c> key with a per-resource TTL. Handlers
+            depend only on <see cref="T:Cinora.Application.Common.Interfaces.ITmdbClient"/> and are oblivious to caching (SRP: the raw client does HTTP +
+            mapping; this decorator adds cache-aside + graceful degradation). Three invariants from ADR 0007:
+            <list type="bullet">
+              <item>never cache a null/empty miss (a 404 details response and an empty search page are re-fetched so
+              a later populate is picked up);</item>
+              <item>degrade, never error — any cache get/set failure is logged and the request falls through to the
+              inner client, so a cache outage never surfaces as an error;</item>
+              <item>±10% per-write TTL jitter so co-created hot keys do not expire in unison (stampede guard).</item>
+            </list>
+            Internal: the composition root registers it wrapping the concrete <see cref="T:Cinora.Infrastructure.Tmdb.TmdbClient"/>.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.CachedTmdbClient.#ctor(Cinora.Application.Common.Interfaces.ITmdbClient,Microsoft.Extensions.Caching.Distributed.IDistributedCache,Microsoft.Extensions.Options.IOptions{Cinora.Infrastructure.Options.CacheOptions},Microsoft.Extensions.Logging.ILogger{Cinora.Infrastructure.Tmdb.CachedTmdbClient})">
+            <summary>Creates the decorator over an inner client, the cache, the cache options, and a logger.</summary>
+            <param name="inner">The wrapped client (the raw <see cref="T:Cinora.Infrastructure.Tmdb.TmdbClient"/>), called on a cache miss.</param>
+            <param name="cache">The distributed cache (the free in-memory provider by default).</param>
+            <param name="options">The cache options supplying <see cref="P:Cinora.Infrastructure.Options.CacheOptions.DefaultTtlSeconds"/>.</param>
+            <param name="logger">The logger used to record cache degradation at Warning.</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.CachedTmdbClient.GetTrendingAsync(Cinora.Domain.Enums.MediaType,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.CachedTmdbClient.GetPopularAsync(Cinora.Domain.Enums.MediaType,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.CachedTmdbClient.GetTopRatedAsync(Cinora.Domain.Enums.MediaType,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.CachedTmdbClient.SearchAsync(Cinora.Domain.Enums.MediaType,System.String,System.Int32,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.CachedTmdbClient.GetDetailsAsync(Cinora.Domain.Enums.MediaType,System.Int32,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.CachedTmdbClient.GetGenresAsync(Cinora.Domain.Enums.MediaType,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.CachedTmdbClient.GetRecommendationsAsync(Cinora.Domain.Enums.MediaType,System.Int32,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.CachedTmdbClient.DiscoverByGenreAsync(Cinora.Domain.Enums.MediaType,System.Collections.Generic.IReadOnlyList{System.Int32},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.CachedTmdbClient.GetRegionalRailAsync(Cinora.Domain.Enums.MediaType,Cinora.Application.Features.Discovery.RailKind,System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Tmdb.CacheLog">
+            <summary>
+            Source-generated, high-performance log messages for <see cref="T:Cinora.Infrastructure.Tmdb.CachedTmdbClient"/>. Using
+            <see cref="T:Microsoft.Extensions.Logging.LoggerMessageAttribute"/> (CA1848) avoids allocations and evaluates arguments only when the
+            level is enabled. A cache read or write failure is logged at Warning and then swallowed: the decorator
+            degrades to the inner TMDB client rather than surfacing a cache outage as an error (ADR 0007 —
+            "degrade, never error"). Defined in a dedicated non-generic partial type because the logging source
+            generator does not emit for generic containing types.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.CacheLog.ReadFailed(Microsoft.Extensions.Logging.ILogger,System.Exception,System.String)">
+            <summary>
+            Logs "TMDB cache read failed for {CacheKey}; falling through to the source" at "Warning" level.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.CacheLog.WriteFailed(Microsoft.Extensions.Logging.ILogger,System.Exception,System.String)">
+            <summary>
+            Logs "TMDB cache write failed for {CacheKey}; the value was served but not cached" at "Warning" level.
+            </summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Tmdb.Dtos.TmdbDetailsDto">
+            <summary>
+            A TMDB title-details response (movie or series) fetched with <c>append_to_response=credits</c>. One DTO
+            covers both media types: movies carry <c>title</c>/<c>release_date</c>/<c>runtime</c>, series carry
+            <c>name</c>/<c>first_air_date</c>/<c>episode_run_time</c>.
+            </summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Tmdb.Dtos.TmdbCreditsDto">
+            <summary>The appended <c>credits</c> object of a TMDB title-details response.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Tmdb.Dtos.TmdbCastMemberDto">
+            <summary>A single cast entry within a TMDB <c>credits.cast</c> array.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Tmdb.Dtos.TmdbGenreDto">
+            <summary>A single TMDB genre from a genre list or a title's <c>genres</c> array.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Tmdb.Dtos.TmdbGenreListDto">
+            <summary>The TMDB <c>/genre/{media}/list</c> response envelope.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Tmdb.Dtos.TmdbPagedDto`1">
+            <summary>The TMDB paged envelope wrapping a list of <typeparamref name="T"/> results.</summary>
+            <typeparam name="T">The wire DTO type of each result.</typeparam>
+        </member>
+        <member name="T:Cinora.Infrastructure.Tmdb.Dtos.TmdbListItemDto">
+            <summary>A single title as it appears in a TMDB list, trending, or search response.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Tmdb.TmdbClient">
+            <summary>
+            The raw TMDB HTTP adapter behind <see cref="T:Cinora.Application.Common.Interfaces.ITmdbClient"/>: a typed <see cref="T:System.Net.Http.HttpClient"/> (base
+            address + v4 Bearer default header + standard resilience pipeline configured at registration) that
+            deserializes TMDB JSON into internal DTOs and maps them to Application read models via
+            <see cref="T:Cinora.Infrastructure.Tmdb.TmdbMapper"/> (ADR 0006). Internal — the composition root registers it and the Milestone 2.1
+            caching decorator wraps it; nothing outside Infrastructure references the concrete type.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbClient.#ctor(System.Net.Http.HttpClient)">
+            <summary>Creates the adapter over a configured typed <see cref="T:System.Net.Http.HttpClient"/>.</summary>
+            <param name="http">The typed client whose base address and Bearer header are set at registration.</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbClient.GetTrendingAsync(Cinora.Domain.Enums.MediaType,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbClient.GetPopularAsync(Cinora.Domain.Enums.MediaType,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbClient.GetTopRatedAsync(Cinora.Domain.Enums.MediaType,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbClient.SearchAsync(Cinora.Domain.Enums.MediaType,System.String,System.Int32,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbClient.GetDetailsAsync(Cinora.Domain.Enums.MediaType,System.Int32,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbClient.GetGenresAsync(Cinora.Domain.Enums.MediaType,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbClient.GetRecommendationsAsync(Cinora.Domain.Enums.MediaType,System.Int32,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbClient.DiscoverByGenreAsync(Cinora.Domain.Enums.MediaType,System.Collections.Generic.IReadOnlyList{System.Int32},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbClient.GetRegionalRailAsync(Cinora.Domain.Enums.MediaType,Cinora.Application.Features.Discovery.RailKind,System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Tmdb.TmdbImageUrlBuilder">
+            <summary>
+            Builds poster/backdrop image URLs from a raw TMDB path and a <see cref="T:Cinora.Application.Common.Tmdb.TmdbImageSize"/>, routing them
+            through the free <c>images.weserv.nl</c> image proxy/CDN. The upstream TMDB URL is derived from the
+            configured <see cref="P:Cinora.Infrastructure.Options.TmdbOptions.ImageBaseUrl"/> (never hardcoded). Stateless and registered as a
+            singleton. Internal — callers depend on the <see cref="T:Cinora.Application.Common.Interfaces.ITmdbImageUrlBuilder"/> port.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbImageUrlBuilder.#ctor(Microsoft.Extensions.Options.IOptions{Cinora.Infrastructure.Options.TmdbOptions})">
+            <summary>Creates the builder, capturing the configured image base URL (trailing slash trimmed).</summary>
+            <param name="options">The bound TMDB options supplying <see cref="P:Cinora.Infrastructure.Options.TmdbOptions.ImageBaseUrl"/>.</param>
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbImageUrlBuilder.Build(System.String,Cinora.Application.Common.Tmdb.TmdbImageSize)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Infrastructure.Tmdb.TmdbMapper">
+            <summary>
+            Maps internal TMDB wire DTOs to Application read models. This is the single boundary where TMDB's
+            snake_case shapes are translated; the DTOs never travel past it (ADR 0006). Internal and stateless.
+            </summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbMapper.ToSummaries(Cinora.Infrastructure.Tmdb.Dtos.TmdbPagedDto{Cinora.Infrastructure.Tmdb.Dtos.TmdbListItemDto},Cinora.Domain.Enums.MediaType)">
+            <summary>Maps a TMDB list/trending/search page to its title summaries (empty when null/absent).</summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbMapper.ToPage(Cinora.Infrastructure.Tmdb.Dtos.TmdbPagedDto{Cinora.Infrastructure.Tmdb.Dtos.TmdbListItemDto},Cinora.Domain.Enums.MediaType)">
+            <summary>Maps a TMDB search page (envelope + results) to a paged read model.</summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbMapper.ToDetails(Cinora.Infrastructure.Tmdb.Dtos.TmdbDetailsDto,Cinora.Domain.Enums.MediaType)">
+            <summary>Maps a TMDB details response to the details read model, or <c>null</c> when absent.</summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbMapper.ToGenres(Cinora.Infrastructure.Tmdb.Dtos.TmdbGenreListDto)">
+            <summary>Maps a TMDB genre-list response to genre read models (empty when null/absent).</summary>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.HrefPattern_0">
+            <summary>Custom <see cref="T:System.Text.RegularExpressions.Regex"/>-derived type for the HrefPattern method.</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.HrefPattern_0.Instance">
+            <summary>Cached, thread-safe singleton instance.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.HrefPattern_0.#ctor">
+            <summary>Initializes the instance.</summary>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.HrefPattern_0.RunnerFactory">
+            <summary>Provides a factory for creating <see cref="T:System.Text.RegularExpressions.RegexRunner"/> instances to be used by methods on <see cref="T:System.Text.RegularExpressions.Regex"/>.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.HrefPattern_0.RunnerFactory.CreateInstance">
+            <summary>Creates an instance of a <see cref="T:System.Text.RegularExpressions.RegexRunner"/> used by methods on <see cref="T:System.Text.RegularExpressions.Regex"/>.</summary>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.HrefPattern_0.RunnerFactory.Runner">
+            <summary>Provides the runner that contains the custom logic implementing the specified regular expression.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.HrefPattern_0.RunnerFactory.Runner.Scan(System.ReadOnlySpan{System.Char})">
+            <summary>Scan the <paramref name="inputSpan"/> starting from base.runtextstart for the next match.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.HrefPattern_0.RunnerFactory.Runner.TryFindNextPossibleStartingPosition(System.ReadOnlySpan{System.Char})">
+            <summary>Search <paramref name="inputSpan"/> starting from base.runtextpos for the next location a match could possibly start.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+            <returns>true if a possible match was found; false if no more matches are possible.</returns>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.HrefPattern_0.RunnerFactory.Runner.TryMatchAtCurrentPosition(System.ReadOnlySpan{System.Char})">
+            <summary>Determine whether <paramref name="inputSpan"/> at base.runtextpos is a match for the regular expression.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+            <returns>true if the regular expression matches at the current position; otherwise, false.</returns>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.KeyPattern_1">
+            <summary>Custom <see cref="T:System.Text.RegularExpressions.Regex"/>-derived type for the KeyPattern method.</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.KeyPattern_1.Instance">
+            <summary>Cached, thread-safe singleton instance.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.KeyPattern_1.#ctor">
+            <summary>Initializes the instance.</summary>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.KeyPattern_1.RunnerFactory">
+            <summary>Provides a factory for creating <see cref="T:System.Text.RegularExpressions.RegexRunner"/> instances to be used by methods on <see cref="T:System.Text.RegularExpressions.Regex"/>.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.KeyPattern_1.RunnerFactory.CreateInstance">
+            <summary>Creates an instance of a <see cref="T:System.Text.RegularExpressions.RegexRunner"/> used by methods on <see cref="T:System.Text.RegularExpressions.Regex"/>.</summary>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.KeyPattern_1.RunnerFactory.Runner">
+            <summary>Provides the runner that contains the custom logic implementing the specified regular expression.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.KeyPattern_1.RunnerFactory.Runner.Scan(System.ReadOnlySpan{System.Char})">
+            <summary>Scan the <paramref name="inputSpan"/> starting from base.runtextstart for the next match.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.KeyPattern_1.RunnerFactory.Runner.TryFindNextPossibleStartingPosition(System.ReadOnlySpan{System.Char})">
+            <summary>Search <paramref name="inputSpan"/> starting from base.runtextpos for the next location a match could possibly start.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+            <returns>true if a possible match was found; false if no more matches are possible.</returns>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.KeyPattern_1.RunnerFactory.Runner.TryMatchAtCurrentPosition(System.ReadOnlySpan{System.Char})">
+            <summary>Determine whether <paramref name="inputSpan"/> at base.runtextpos is a match for the regular expression.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+            <returns>true if the regular expression matches at the current position; otherwise, false.</returns>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.Utilities">
+            <summary>Helper methods used by generated <see cref="T:System.Text.RegularExpressions.Regex"/>-derived implementations.</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.Utilities.s_defaultTimeout">
+            <summary>Default timeout value set in <see cref="T:System.AppContext"/>, or <see cref="F:System.Text.RegularExpressions.Regex.InfiniteMatchTimeout"/> if none was set.</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.Utilities.s_hasTimeout">
+            <summary>Whether <see cref="F:System.Text.RegularExpressions.Generated.Utilities.s_defaultTimeout"/> is non-infinite.</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.Utilities.s_asciiHexDigitsLower">
+            <summary>Supports searching for characters in or not in "0123456789abcdef".</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.Utilities.s_indexOfString_href_OrdinalIgnoreCase">
+            <summary>Supports searching for the string "href".</summary>
+        </member>
+    </members>
+</doc>

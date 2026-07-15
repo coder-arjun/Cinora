@@ -1,0 +1,59 @@
+@*
+    "Invite friends on WhatsApp" — a share link that opens WhatsApp with a professional, branded, pre-filled invite
+    pointing back to THIS deployment (built from the current request's scheme + host, so it links to wherever Cinora
+    runs). The 🎬 header brands the message text itself, and because the link carries Cinora's Open Graph card
+    (_Layout → og:image = /og-image.png), WhatsApp renders a rich preview with the Cinora logo beneath the message.
+    It is a plain outbound <a> navigation (not a fetch), so the strict connect-src 'self' CSP is untouched;
+    target="_blank" + rel="noopener noreferrer" open WhatsApp safely. The message is URL-encoded server-side.
+*@
+@{
+    var appUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
+    // Branded, multi-line invite (\n survives URL-encoding into the WhatsApp draft). The emoji heads the message
+    // as a lightweight logo; the shared link then unfurls into the full Cinora OG card.
+    var inviteMessage =
+        "⭐ Cinora — social reviews for film & series.\n\n"
+        + "Rate movies & shows, follow reviews from your friends, build watchlists, and get "
+        + "recommendations picked for your taste.\n\n"
+        + $"Join me — see what I am watching: {appUrl}";
+    var whatsAppUrl = "https://wa.me/?text=" + Uri.EscapeDataString(inviteMessage);
+}
+<div class="card-glass mt-8 flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:gap-5 sm:p-6">
+    @* The Cinora brand mark (gold "C" cradling a play triangle) — inline SVG, no image request, CSP-safe. Unique
+       gradient ids (invite*) so it never collides with the header lockup's _Logo defs on the same page. *@
+    <span class="hidden shrink-0 sm:inline-flex" aria-hidden="true">
+        <svg viewBox="0 0 32 32" class="h-14 w-14" focusable="false">
+            <defs>
+                <linearGradient id="inviteGold" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="#f4d488" />
+                    <stop offset="1" stop-color="#d9a02c" />
+                </linearGradient>
+                <linearGradient id="inviteTile" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="#171a22" />
+                    <stop offset="1" stop-color="#0a0c11" />
+                </linearGradient>
+                <radialGradient id="inviteGlow" cx="0.5" cy="0.46" r="0.55">
+                    <stop offset="0" stop-color="#ebbd57" stop-opacity="0.30" />
+                    <stop offset="0.7" stop-color="#ebbd57" stop-opacity="0.05" />
+                    <stop offset="1" stop-color="#ebbd57" stop-opacity="0" />
+                </radialGradient>
+            </defs>
+            <rect x="1.25" y="1.25" width="29.5" height="29.5" rx="8" fill="url(#inviteTile)" stroke="#ebbd57" stroke-opacity="0.22" />
+            <circle cx="16" cy="15.4" r="10.5" fill="url(#inviteGlow)" />
+            <path d="M22.78 20.24 A8 8 0 1 1 22.78 11.76" fill="none" stroke="url(#inviteGold)" stroke-width="3.3" stroke-linecap="round" />
+            <path d="M13.5 12.5 L19 16 L13.5 19.5 Z" fill="url(#inviteGold)" />
+        </svg>
+    </span>
+    <div class="min-w-0 flex-1">
+        <h2 class="font-display text-lg text-ink">Bring your friends to Cinora</h2>
+        <p class="mt-1 text-sm text-ink-subtle">
+            Share an invite — they'll get the Cinora card and can join in a tap.
+        </p>
+    </div>
+    <a href="@whatsAppUrl" target="_blank" rel="noopener noreferrer"
+       class="btn btn-primary shrink-0 gap-2 text-sm">
+        <svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+            <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.2 4.79 1.2h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm5.83 4.09c1.56 1.56 2.42 3.63 2.42 5.82 0 4.54-3.7 8.24-8.25 8.24a8.2 8.2 0 0 1-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.25-8.24 2.2 0 4.27.86 5.83 2.6zM8.53 7.33c-.16 0-.43.06-.66.31-.22.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.57.12.16 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.46-.6 1.67-1.18.21-.58.21-1.07.14-1.18-.06-.1-.22-.16-.47-.28-.25-.12-1.46-.72-1.69-.8-.22-.08-.39-.12-.55.12-.16.25-.63.8-.78.96-.14.16-.29.18-.53.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.16.04-.31-.02-.43-.06-.12-.55-1.34-.76-1.83-.2-.48-.4-.42-.55-.43-.14-.01-.3-.01-.47-.01z" />
+        </svg>
+        Invite on WhatsApp
+    </a>
+</div>

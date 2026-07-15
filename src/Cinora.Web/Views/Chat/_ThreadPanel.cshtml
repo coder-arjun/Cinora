@@ -1,0 +1,84 @@
+@using Cinora.Domain.Enums
+@using Cinora.Web.ViewModels.Common
+@model Cinora.Web.ViewModels.Chat.ChatThreadVm
+@{
+    var header = Model.Header;
+    var isGroup = header.Type == ConversationType.Group;
+}
+@*
+    §6 — the open conversation (right pane): header (+ group-info toggle), the scrollable message list, a typing
+    indicator, and the composer with the emoji picker. All message text is Razor @-encoded / textContent. The
+    interactivity (send-clear, scroll, emoji, typing, read, realtime append) is wired by Scripts/components/chat.ts
+    keyed off #chat-root — no inline JS, so the strict CSP is untouched.
+*@
+<div class="flex h-full min-h-0 flex-col">
+    @* Header *@
+    <div class="flex items-center gap-3 border-b border-white/10 bg-surface-1/60 px-4 py-3">
+        <a asp-controller="Chat" asp-action="Index" class="rounded-btn p-1.5 text-ink-muted transition-colors hover:bg-white/5 hover:text-ink md:hidden" aria-label="Back to conversations">
+            <svg viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5" aria-hidden="true"><path fill-rule="evenodd" d="M12.7 4.3a1 1 0 010 1.4L8.42 10l4.3 4.3a1 1 0 01-1.42 1.4l-5-5a1 1 0 010-1.4l5-5a1 1 0 011.42 0z" clip-rule="evenodd" /></svg>
+        </a>
+        @if (isGroup)
+        {
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill border border-white/10 bg-surface-2/70 text-ink-subtle" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="h-5 w-5"><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19a5.5 5.5 0 0 1 11 0" /><path d="M16 5.4a3 3 0 0 1 0 5.9" /><path d="M17.8 19a5.5 5.5 0 0 0-3-4.9" /></svg>
+            </span>
+        }
+        else
+        {
+            <partial name="_Avatar" model="new AvatarViewModel(header.Title, header.AvatarFileKey, AvatarSize.Medium, Decorative: true)" />
+        }
+        <div class="min-w-0 flex-1">
+            <p class="truncate font-display text-lg text-ink">@header.Title</p>
+            @if (isGroup)
+            {
+                <p class="text-xs text-ink-subtle">@header.Members.Count members</p>
+            }
+        </div>
+        @if (isGroup)
+        {
+            <button type="button" data-chat-action="toggle-group-panel"
+                    class="rounded-btn p-2 text-ink-muted transition-colors hover:bg-white/5 hover:text-ink" aria-label="Group details">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5" aria-hidden="true"><path d="M10 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 8.5A1.5 1.5 0 1110 11.5 1.5 1.5 0 0110 8.5zM10 14a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" /></svg>
+            </button>
+        }
+    </div>
+
+    @if (isGroup)
+    {
+        <partial name="_GroupPanel" model="Model" />
+    }
+
+    @* Messages *@
+    <div id="message-list" data-conversation-id="@header.Id"
+         class="flex flex-1 flex-col gap-2.5 overflow-y-auto px-4 py-4">
+        <partial name="_MessageList" model="Model.Messages" />
+    </div>
+
+    @* Typing indicator (filled by chat.ts) *@
+    <div id="chat-typing" class="h-5 px-5 text-xs italic text-ink-subtle" aria-live="polite"></div>
+
+    @* Composer *@
+    <form id="chat-composer" data-conversation-id="@header.Id"
+          asp-controller="Chat" asp-action="Send" asp-route-id="@header.Id" method="post"
+          hx-post="@Url.Action("Send", "Chat", new { id = header.Id })"
+          hx-target="#message-list" hx-swap="beforeend"
+          class="relative flex items-end gap-2 border-t border-white/10 bg-surface-1/60 px-3 py-3">
+        <div class="relative">
+            <button type="button" id="emoji-toggle" data-chat-action="toggle-emoji"
+                    class="flex h-10 w-10 items-center justify-center rounded-btn text-xl text-ink-muted transition-colors hover:bg-white/5 hover:text-ink"
+                    aria-label="Insert emoji" aria-expanded="false">😊</button>
+            <div id="emoji-popover"
+                 class="absolute bottom-12 left-0 z-20 hidden w-80 max-w-[calc(100vw-2rem)] rounded-card border border-white/10 bg-surface-1 shadow-elevated"
+                 role="dialog" aria-label="Emoji picker"></div>
+        </div>
+        <label for="chat-message-input" class="sr-only">Message</label>
+        <textarea id="chat-message-input" name="Body" rows="1" required maxlength="4000"
+                  autocomplete="off" placeholder="Write a message…"
+                  class="max-h-32 min-h-[2.5rem] flex-1 resize-none rounded-btn border border-white/10 bg-surface-2/60 px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-subtle focus:border-accent/40 focus:outline-none"></textarea>
+        <button type="submit"
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-btn bg-accent text-on-accent transition-opacity hover:opacity-90"
+                aria-label="Send message">
+            <svg viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5" aria-hidden="true"><path d="M2.9 2.6a1 1 0 011.02-.16l14 6a1 1 0 010 1.84l-14 6A1 1 0 012.6 15l1.9-5 6.5-.9-6.5-.9-1.9-5a1 1 0 01.3-.6z" /></svg>
+        </button>
+    </form>
+</div>

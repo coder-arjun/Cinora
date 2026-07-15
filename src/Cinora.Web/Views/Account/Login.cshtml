@@ -1,0 +1,73 @@
+@model LoginViewModel
+@{
+    ViewData["Title"] = "Sign in";
+    ViewData["MinimalNav"] = true;
+}
+
+<section class="mx-auto flex w-full max-w-md flex-col px-4 py-16 sm:py-24">
+    <div class="card-glass animate-rise-in p-6 sm:p-8">
+        <h1 class="font-display text-3xl text-ink">Welcome back</h1>
+        <p class="mt-2 text-sm text-ink-muted">Sign in to continue to Cinora.</p>
+
+        <form asp-controller="Account" asp-action="Login" method="post" class="mt-8 space-y-5">
+            <div asp-validation-summary="ModelOnly" role="alert"></div>
+            <input type="hidden" asp-for="ReturnUrl" />
+
+            <div>
+                <label asp-for="EmailOrUserName" class="label"></label>
+                <input asp-for="EmailOrUserName" type="text" autocomplete="username" class="input"
+                       placeholder="you@example.com or your display name"
+                       aria-describedby="EmailOrUserName-error"
+                       aria-invalid="@(ViewData.ModelState[nameof(Model.EmailOrUserName)]?.Errors.Count > 0 ? "true" : "false")" />
+                <span asp-validation-for="EmailOrUserName" id="EmailOrUserName-error"></span>
+            </div>
+
+            <div>
+                <label asp-for="Password" class="label"></label>
+                <div class="relative" x-data="passwordToggle">
+                    <input asp-for="Password" autocomplete="current-password" class="input pr-11"
+                           x-bind:type="inputType"
+                           aria-describedby="Password-error"
+                           aria-invalid="@(ViewData.ModelState[nameof(Model.Password)]?.Errors.Count > 0 ? "true" : "false")" />
+                    <partial name="_PasswordEyeButton" />
+                </div>
+                <span asp-validation-for="Password" id="Password-error"></span>
+            </div>
+
+            <div class="flex items-center justify-between gap-3">
+                <label class="flex min-h-6 items-center gap-2 py-1 text-sm text-ink-muted">
+                    <input asp-for="RememberMe" class="size-4 rounded accent-accent" />
+                    Remember me
+                </label>
+                <a asp-controller="Account" asp-action="ForgotPassword" class="link text-sm">Forgot password?</a>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-full">Sign in</button>
+        </form>
+
+        @if (Model.ExternalSchemes.Count > 0)
+        {
+            <section aria-label="External sign-in" class="mt-8">
+                <div class="mb-4 flex items-center gap-3 text-xs uppercase tracking-widest text-ink-subtle">
+                    <span class="h-px flex-1 bg-white/10"></span>
+                    Or sign in with
+                    <span class="h-px flex-1 bg-white/10"></span>
+                </div>
+                <div class="flex flex-col gap-2">
+                    @foreach (var scheme in Model.ExternalSchemes)
+                    {
+                        <form asp-controller="Account" asp-action="ExternalLogin" method="post">
+                            <input type="hidden" name="provider" value="@scheme.Name" />
+                            <input type="hidden" asp-for="ReturnUrl" />
+                            <button type="submit" class="btn btn-ghost w-full">@(scheme.DisplayName ?? scheme.Name)</button>
+                        </form>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+
+    <p class="mt-6 text-center text-sm text-ink-muted">
+        New to Cinora? <a asp-controller="Account" asp-action="Register" class="link">Create an account</a>
+    </p>
+</section>

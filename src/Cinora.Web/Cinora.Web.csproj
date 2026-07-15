@@ -1,0 +1,74 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <UserSecretsId>60e36e64-7ba0-43a4-bedc-c36d514473c2</UserSecretsId>
+  </PropertyGroup>
+
+  <!--
+    Cinora.Web — ASP.NET Core startup / composition root.
+    References Application + Infrastructure (Infrastructure solely so Program.cs can compose the
+    graph via a future AddInfrastructure(...)), §3.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Cinora.Application\Cinora.Application.csproj" />
+    <ProjectReference Include="..\Cinora.Infrastructure\Cinora.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!--
+    EF tooling requirement (solution-structure.md §4): the STARTUP project needs the Design package
+    so `dotnet ef` can build the model. Migrations themselves live in Cinora.Infrastructure.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
+  </ItemGroup>
+
+  <!-- Milestone 1.3: Google OAuth external-login handler (AddGoogle in Program.cs). -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" />
+  </ItemGroup>
+
+  <!--
+    Milestone 5.3 — Hangfire OSS at the composition root (ADR 0018). Hangfire.AspNetCore supplies the DI client
+    (AddHangfire/AddHangfireServer) + the endpoint-routed MapHangfireDashboard; Hangfire.SqlServer supplies
+    UseSqlServerStorage over the existing SQL Server database. Both are LGPLv3 — free OSS, no Docker (CLAUDE.md's
+    approved substitution, NOT Hangfire Pro). Newtonsoft.Json 13.0.3 (MIT) is a DIRECT override that supersedes
+    the vulnerable Newtonsoft.Json 11.0.1 pulled transitively by Hangfire (NU1903 — a HIGH-severity advisory that
+    would otherwise fail the 0-warning build). Versions are pinned centrally.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Hangfire.AspNetCore" />
+    <PackageReference Include="Hangfire.SqlServer" />
+    <PackageReference Include="Newtonsoft.Json" />
+  </ItemGroup>
+
+  <!--
+    Milestone 1.4: Serilog host integration (two-stage bootstrap + UseSerilogRequestLogging) and the
+    Console + rolling File sinks. Serilog.AspNetCore bundles the Console sink transitively; both sinks
+    are referenced explicitly so their versions are pinned centrally and intent is visible. Apache-2.0.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
+  </ItemGroup>
+
+  <!--
+    Milestone 1.6a — frontend asset pipeline (Tailwind v4 + esbuild). The npm build (package.json /
+    build.mjs) emits hashed, minified CSS + JS into wwwroot/dist. This target runs `npm ci` then
+    `npm run build` BEFORE the SDK collects static web assets, so `dotnet publish` always ships
+    freshly-built, fingerprinted assets in the published wwwroot (solution-structure.md §5).
+
+    Gate: runs during publish (_IsPublishing) OR when the assets have never been built (missing
+    manifest.json). A normal inner-loop `dotnet build` with assets already present is a NO-OP — npm
+    is never invoked, so the inner loop stays fast. package-lock.json makes `npm ci` reproducible.
+  -->
+  <Target Name="BuildFrontendAssets"
+          BeforeTargets="ResolveProjectStaticWebAssets"
+          Condition="'$(_IsPublishing)' == 'true' Or !Exists('$(MSBuildProjectDirectory)/wwwroot/dist/manifest.json')">
+    <Message Importance="high" Text="Cinora: building frontend assets (Tailwind v4 + esbuild)…" />
+    <Exec Command="npm ci" WorkingDirectory="$(MSBuildProjectDirectory)"
+          Condition="'$(_IsPublishing)' == 'true' Or !Exists('$(MSBuildProjectDirectory)/node_modules')" />
+    <Exec Command="npm run build" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
+</Project>

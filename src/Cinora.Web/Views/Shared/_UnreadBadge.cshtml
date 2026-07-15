@@ -1,0 +1,14 @@
+@model int
+@*
+    Milestone 3.5 — the live unread-notifications badge. Rendered inside the nav bell (via the NotificationBell
+    view component) and returned on its own by GET /notifications/unread-count for the no-JS polling fallback.
+    The stable id "notification-unread-badge" + data-unread-count marker let the frontend's SignalR client update
+    the count live on UnreadCountChanged (that JS wiring is a separate frontend task); this only seeds the
+    server-rendered value. Hidden at zero. No inline JS — the strict CSP is untouched.
+*@
+<span id="notification-unread-badge"
+      data-unread-count="@Model"
+      class="pointer-events-none absolute -right-0.5 -top-0.5 inline-flex min-w-[1.15rem] items-center justify-center rounded-pill bg-accent px-1 text-[0.65rem] font-semibold leading-tight text-on-accent @(Model > 0 ? null : "hidden")">
+    @* L1: cap parity with the SignalR client (site.ts) — both render "9+". *@
+    @(Model > 9 ? "9+" : Model.ToString(System.Globalization.CultureInfo.InvariantCulture))
+</span>

@@ -1,0 +1,893 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Cinora.Domain</name>
+    </assembly>
+    <members>
+        <member name="T:Cinora.Domain.Common.Guard">
+            <summary>
+            Internal guard helpers that centralize the small, repeated invariant checks used by the
+            domain factory and behaviour methods. Kept <c>internal</c> so it is not part of the public
+            domain surface. Every failure surfaces as a <see cref="T:Cinora.Domain.Exceptions.DomainException"/>.
+            </summary>
+        </member>
+        <member name="M:Cinora.Domain.Common.Guard.Required(System.String,System.String)">
+            <summary>Ensures a string is neither null, empty, nor whitespace and returns it.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Common.Guard.Required(System.String,System.Int32,System.String)">
+            <summary>Ensures a string is required (see <see cref="M:Cinora.Domain.Common.Guard.Required(System.String,System.String)"/>) and within a maximum length.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Common.Guard.Positive(System.Int32,System.String)">
+            <summary>Ensures an integer is strictly greater than zero and returns it.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Common.Guard.NonNegative(System.Int32,System.String)">
+            <summary>Ensures an integer is zero or greater and returns it.</summary>
+        </member>
+        <member name="T:Cinora.Domain.Entities.AIRecommendationHistory">
+            <summary>
+            An audit record of one AI recommendation generation (Phase 5): which model ran, a summary of the
+            grounding input and generated output, and the token usage. Enables cost/latency tracking and
+            lets the app avoid regenerating identical recommendations.
+            </summary>
+        </member>
+        <member name="F:Cinora.Domain.Entities.AIRecommendationHistory.ModelMaxLength">
+            <summary>The maximum allowed length of the <see cref="P:Cinora.Domain.Entities.AIRecommendationHistory.Model"/> name.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Entities.AIRecommendationHistory.SummaryMaxLength">
+            <summary>The maximum allowed length of an input or output summary.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.AIRecommendationHistory.Id">
+            <summary>The unique identifier of the history record.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.AIRecommendationHistory.UserId">
+            <summary>The identifier of the user the recommendation was generated for.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.AIRecommendationHistory.Model">
+            <summary>The name/identifier of the model that produced the recommendation.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.AIRecommendationHistory.InputSummary">
+            <summary>A summary of the grounding input sent to the model.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.AIRecommendationHistory.OutputSummary">
+            <summary>A summary of the recommendation the model produced.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.AIRecommendationHistory.PromptTokens">
+            <summary>The number of prompt (input) tokens consumed.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.AIRecommendationHistory.CompletionTokens">
+            <summary>The number of completion (output) tokens produced.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.AIRecommendationHistory.GeneratedAtUtc">
+            <summary>The UTC instant the recommendation was generated.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Entities.AIRecommendationHistory.Create(System.Guid,System.String,System.String,System.String,System.Int32,System.Int32)">
+            <summary>Creates a new AI recommendation history record.</summary>
+            <param name="userId">The target user's identifier.</param>
+            <param name="model">The model name; required, max <see cref="F:Cinora.Domain.Entities.AIRecommendationHistory.ModelMaxLength"/> characters.</param>
+            <param name="inputSummary">A summary of the grounding input; required, max <see cref="F:Cinora.Domain.Entities.AIRecommendationHistory.SummaryMaxLength"/> characters.</param>
+            <param name="outputSummary">A summary of the produced recommendation; required, max <see cref="F:Cinora.Domain.Entities.AIRecommendationHistory.SummaryMaxLength"/> characters.</param>
+            <param name="promptTokens">The prompt token count; must be zero or greater.</param>
+            <param name="completionTokens">The completion token count; must be zero or greater.</param>
+            <returns>A new <see cref="T:Cinora.Domain.Entities.AIRecommendationHistory"/> record.</returns>
+        </member>
+        <member name="T:Cinora.Domain.Entities.Comment">
+            <summary>A user's comment on a <see cref="T:Cinora.Domain.Entities.Review"/>. Guards a non-empty, bounded body.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Entities.Comment.BodyMaxLength">
+            <summary>The maximum allowed length of a comment <see cref="P:Cinora.Domain.Entities.Comment.Body"/>.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Comment.Id">
+            <summary>The unique identifier of the comment.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Comment.ReviewId">
+            <summary>The identifier of the commented-on <see cref="T:Cinora.Domain.Entities.Review"/>.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Comment.UserId">
+            <summary>The identifier of the comment's author.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Comment.Body">
+            <summary>The comment text.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Comment.CreatedAtUtc">
+            <summary>The UTC instant the comment was created.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Comment.Create(System.Guid,System.Guid,System.String)">
+            <summary>Creates a new comment on a review.</summary>
+            <param name="reviewId">The commented-on review's identifier.</param>
+            <param name="userId">The author's identifier.</param>
+            <param name="body">The comment text; required, max <see cref="F:Cinora.Domain.Entities.Comment.BodyMaxLength"/> characters.</param>
+            <returns>A new <see cref="T:Cinora.Domain.Entities.Comment"/>.</returns>
+        </member>
+        <member name="T:Cinora.Domain.Entities.Conversation">
+            <summary>
+            A chat conversation — either a 1:1 <see cref="F:Cinora.Domain.Enums.ConversationType.Direct"/> chat or a named
+            <see cref="F:Cinora.Domain.Enums.ConversationType.Group"/>. Membership is modelled separately by <c>ConversationMember</c>;
+            messages by <c>Message</c> (both added in Task C1.2). <see cref="P:Cinora.Domain.Entities.Conversation.LastMessageAtUtc"/> is denormalized
+            (bumped on each send) so the conversation list sorts by recency without scanning messages.
+            </summary>
+        </member>
+        <member name="F:Cinora.Domain.Entities.Conversation.TitleMaxLength">
+            <summary>The maximum length of a group <see cref="P:Cinora.Domain.Entities.Conversation.Title"/>.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Conversation.Id">
+            <summary>The unique identifier of this conversation.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Conversation.Type">
+            <summary>Whether this is a 1:1 direct chat or a group.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Conversation.Title">
+            <summary>The group name, or <c>null</c> for a direct chat (the UI derives the title from the other member).</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Conversation.CreatedByUserId">
+            <summary>The user who started the conversation (the initial group admin).</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Conversation.CreatedAtUtc">
+            <summary>The UTC instant the conversation was created.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Conversation.LastMessageAtUtc">
+            <summary>The UTC instant of the most recent message (bumped on each send); drives the recency sort.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Conversation.CreateDirect(System.Guid,System.Guid)">
+            <summary>Creates a 1:1 direct conversation between two distinct users.</summary>
+            <param name="userAId">One participant.</param>
+            <param name="userBId">The other participant; must differ from <paramref name="userAId"/>.</param>
+            <returns>A new direct <see cref="T:Cinora.Domain.Entities.Conversation"/>.</returns>
+            <exception cref="T:Cinora.Domain.Exceptions.DomainException">Thrown when the two ids are equal.</exception>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Conversation.CreateGroup(System.Guid,System.String)">
+            <summary>Creates a named group conversation owned by <paramref name="creatorId"/>.</summary>
+            <param name="creatorId">The creator (initial admin).</param>
+            <param name="title">The group name; required, max <see cref="F:Cinora.Domain.Entities.Conversation.TitleMaxLength"/> characters.</param>
+            <returns>A new group <see cref="T:Cinora.Domain.Entities.Conversation"/>.</returns>
+            <exception cref="T:Cinora.Domain.Exceptions.DomainException">Thrown when the title is blank or too long.</exception>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Conversation.Rename(System.String)">
+            <summary>Renames a group conversation.</summary>
+            <param name="title">The new title; required, max <see cref="F:Cinora.Domain.Entities.Conversation.TitleMaxLength"/> characters.</param>
+            <exception cref="T:Cinora.Domain.Exceptions.DomainException">Thrown when the conversation is not a group or the title is invalid.</exception>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Conversation.BumpLastMessage(System.DateTime)">
+            <summary>Advances <see cref="P:Cinora.Domain.Entities.Conversation.LastMessageAtUtc"/> to the given instant (called when a message is sent).</summary>
+            <param name="atUtc">The new most-recent-message instant.</param>
+        </member>
+        <member name="T:Cinora.Domain.Entities.ConversationMember">
+            <summary>
+            A user's membership in a <see cref="T:Cinora.Domain.Entities.Conversation"/> — the join that authorizes reading/sending (participation
+            is the authorization, §3). <see cref="P:Cinora.Domain.Entities.ConversationMember.LastReadAtUtc"/> drives both unread counts and read receipts.
+            </summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.ConversationMember.Id">
+            <summary>The unique identifier of this membership row.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.ConversationMember.ConversationId">
+            <summary>The conversation this membership belongs to.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.ConversationMember.UserId">
+            <summary>The member user's id.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.ConversationMember.Role">
+            <summary>The member's role (group admin vs ordinary member).</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.ConversationMember.JoinedAtUtc">
+            <summary>The UTC instant the user joined (also the admin-promotion tiebreaker: earliest-joined wins).</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.ConversationMember.LastReadAtUtc">
+            <summary>The UTC instant up to which the user has read; drives unread counts + read receipts.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Entities.ConversationMember.Create(System.Guid,System.Guid,Cinora.Domain.Enums.ConversationRole)">
+            <summary>Creates a membership row.</summary>
+            <param name="conversationId">The conversation.</param>
+            <param name="userId">The member.</param>
+            <param name="role">The member's role.</param>
+            <returns>A new <see cref="T:Cinora.Domain.Entities.ConversationMember"/> with <see cref="P:Cinora.Domain.Entities.ConversationMember.LastReadAtUtc"/> seeded to now.</returns>
+        </member>
+        <member name="M:Cinora.Domain.Entities.ConversationMember.MarkRead(System.DateTime)">
+            <summary>Advances the read watermark (never backwards).</summary>
+            <param name="atUtc">The instant read up to.</param>
+        </member>
+        <member name="M:Cinora.Domain.Entities.ConversationMember.Promote">
+            <summary>Promotes this member to <see cref="F:Cinora.Domain.Enums.ConversationRole.Admin"/> (used when the admin leaves).</summary>
+        </member>
+        <member name="T:Cinora.Domain.Entities.Device">
+            <summary>
+            A Web Push subscription for one of a user's devices (Phase 6). It stores the push endpoint and
+            the encryption keys required to send push messages, plus when the subscription was last seen.
+            </summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Device.Id">
+            <summary>The unique identifier of the device subscription.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Device.UserId">
+            <summary>The identifier of the owning user.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Device.Endpoint">
+            <summary>The push service endpoint to deliver messages to.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Device.EndpointHash">
+            <summary>
+            The SHA-256 hex digest of <see cref="P:Cinora.Domain.Entities.Device.Endpoint"/> (Milestone 6.3). Fixed-width (64 chars) so it is
+            indexable — the raw <see cref="P:Cinora.Domain.Entities.Device.Endpoint"/> (up to 2048 chars) exceeds SQL Server's 900-byte index key
+            limit. Backs the unique <c>(UserId, EndpointHash)</c> index that makes the subscribe upsert race-safe.
+            </summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Device.P256dhKey">
+            <summary>The client's P-256 ECDH public key used to encrypt push payloads.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Device.AuthSecret">
+            <summary>The client's authentication secret used to encrypt push payloads.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Device.CreatedAtUtc">
+            <summary>The UTC instant the subscription was registered.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Device.LastSeenUtc">
+            <summary>The UTC instant the subscription was last seen active.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Device.Register(System.Guid,System.String,System.String,System.String)">
+            <summary>Registers a new Web Push subscription for a user's device.</summary>
+            <param name="userId">The owning user's identifier.</param>
+            <param name="endpoint">The push service endpoint; required.</param>
+            <param name="p256dhKey">The client's P-256 ECDH public key; required.</param>
+            <param name="authSecret">The client's authentication secret; required.</param>
+            <returns>A new <see cref="T:Cinora.Domain.Entities.Device"/> subscription.</returns>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Device.ComputeEndpointHash(System.String)">
+            <summary>
+            Computes the fixed-width (64-char, lowercase) SHA-256 hex digest of a push endpoint (Milestone 6.3). Pure
+            and dependency-free (BCL <see cref="T:System.Security.Cryptography.SHA256"/>), so the upsert handler can key on <c>(UserId, EndpointHash)</c>
+            without exposing the endpoint's raw (unindexable) value.
+            </summary>
+            <param name="endpoint">The push service endpoint; required.</param>
+            <returns>The lowercase 64-character SHA-256 hex digest.</returns>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Device.UpdateSubscription(System.String,System.String)">
+            <summary>
+            Rotates the encryption keys for an existing subscription in place and marks it seen (Milestone 6.2). A
+            browser re-subscribe reuses the same <see cref="P:Cinora.Domain.Entities.Device.Endpoint"/> but can mint fresh keys, so the upsert path
+            refreshes them here rather than inserting a duplicate <see cref="T:Cinora.Domain.Entities.Device"/> for the same endpoint.
+            </summary>
+            <param name="p256dhKey">The client's new P-256 ECDH public key; required.</param>
+            <param name="authSecret">The client's new authentication secret; required.</param>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Device.Seen">
+            <summary>Records that the subscription was seen active now.</summary>
+        </member>
+        <member name="T:Cinora.Domain.Entities.Friend">
+            <summary>
+            A directed friendship between two users: the <see cref="P:Cinora.Domain.Entities.Friend.RequesterId"/> who sent the request and
+            the <see cref="P:Cinora.Domain.Entities.Friend.AddresseeId"/> who received it. Tracks the request lifecycle and enforces that a
+            user cannot befriend themselves and that only a pending request can be answered.
+            </summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Friend.Id">
+            <summary>The unique identifier of this friendship record.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Friend.RequesterId">
+            <summary>The identifier of the user who sent the friend request.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Friend.AddresseeId">
+            <summary>The identifier of the user who received the friend request.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Friend.Status">
+            <summary>The current status of the friendship.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Friend.RequestedAtUtc">
+            <summary>The UTC instant the request was created.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Friend.RespondedAtUtc">
+            <summary>The UTC instant the request was accepted or declined, or <c>null</c> while pending.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Friend.Request(System.Guid,System.Guid)">
+            <summary>Creates a new pending friend request.</summary>
+            <param name="requesterId">The user sending the request.</param>
+            <param name="addresseeId">The user receiving the request; must differ from the requester.</param>
+            <returns>A new <see cref="T:Cinora.Domain.Entities.Friend"/> in the <see cref="F:Cinora.Domain.Enums.FriendStatus.Pending"/> state.</returns>
+            <exception cref="T:Cinora.Domain.Exceptions.DomainException">Thrown when a user attempts to befriend themselves.</exception>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Friend.Accept">
+            <summary>Accepts a pending friend request.</summary>
+            <exception cref="T:Cinora.Domain.Exceptions.DomainException">Thrown when the request is not pending.</exception>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Friend.Decline">
+            <summary>Declines a pending friend request.</summary>
+            <exception cref="T:Cinora.Domain.Exceptions.DomainException">Thrown when the request is not pending.</exception>
+        </member>
+        <member name="T:Cinora.Domain.Entities.Genre">
+            <summary>A TMDB genre (for example "Drama" or "Science Fiction") that titles can be tagged with.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Entities.Genre.NameMaxLength">
+            <summary>The maximum allowed length of a <see cref="P:Cinora.Domain.Entities.Genre.Name"/>.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Genre.Id">
+            <summary>Cinora's internal identifier for the genre.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Genre.TmdbGenreId">
+            <summary>The TMDB genre identifier this record was sourced from.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Genre.Name">
+            <summary>The display name of the genre.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Genre.Create(System.Int32,System.String)">
+            <summary>Creates a genre from TMDB metadata.</summary>
+            <param name="tmdbGenreId">The TMDB genre identifier; must be greater than zero.</param>
+            <param name="name">The display name; required, max <see cref="F:Cinora.Domain.Entities.Genre.NameMaxLength"/> characters.</param>
+            <returns>A new <see cref="T:Cinora.Domain.Entities.Genre"/>.</returns>
+        </member>
+        <member name="T:Cinora.Domain.Entities.Message">
+            <summary>
+            A single chat message. The <see cref="P:Cinora.Domain.Entities.Message.Body"/> is user text — PLAIN TEXT, Razor output-encoded on render,
+            never HTML (§13). Deleting is a soft tombstone (<see cref="P:Cinora.Domain.Entities.Message.IsDeleted"/>) so keyset history + read positions
+            stay stable; the UI renders a "message deleted" placeholder in its place. A message may instead (or also)
+            carry a shared MOVIE reference (<see cref="P:Cinora.Domain.Entities.Message.SharedMovieTmdbId"/> et al.), in which case the UI renders a movie
+            card; the <see cref="P:Cinora.Domain.Entities.Message.Body"/> then holds an optional caption (possibly empty).
+            </summary>
+        </member>
+        <member name="F:Cinora.Domain.Entities.Message.BodyMaxLength">
+            <summary>The maximum length of a message <see cref="P:Cinora.Domain.Entities.Message.Body"/>.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Entities.Message.SharedMovieTitleMaxLength">
+            <summary>The maximum length of a shared movie's title.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Entities.Message.SharedMovieFieldMaxLength">
+            <summary>The maximum length of a shared movie's media-type token and poster path.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Message.Id">
+            <summary>The unique identifier of this message.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Message.ConversationId">
+            <summary>The conversation this message belongs to.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Message.SenderId">
+            <summary>The sender's user id.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Message.Body">
+            <summary>The message text (plain text; Razor-encoded on render). For a movie share this is the caption (may be empty).</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Message.SentAtUtc">
+            <summary>The UTC instant the message was sent (part of the history keyset).</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Message.IsDeleted">
+            <summary>Whether the sender soft-deleted this message (rendered as a "message deleted" tombstone).</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Message.SharedMovieTmdbId">
+            <summary>The TMDB id of a shared movie/series, or <c>null</c> for a plain-text message.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Message.SharedMovieMediaType">
+            <summary>The shared title's media type (the <c>MediaType</c> enum name, e.g. "Movie"/"Series"), or <c>null</c>.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Message.SharedMovieTitle">
+            <summary>The shared title's display name (denormalized so the card renders standalone), or <c>null</c>.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Message.SharedMoviePosterPath">
+            <summary>The shared title's raw TMDB poster path (rendered via the TMDB image seam), or <c>null</c>.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Message.Create(System.Guid,System.Guid,System.String)">
+            <summary>Creates a plain-text message.</summary>
+            <param name="conversationId">The conversation.</param>
+            <param name="senderId">The sender.</param>
+            <param name="body">The text; required, max <see cref="F:Cinora.Domain.Entities.Message.BodyMaxLength"/> characters.</param>
+            <returns>A new <see cref="T:Cinora.Domain.Entities.Message"/>.</returns>
+            <exception cref="T:Cinora.Domain.Exceptions.DomainException">Thrown when the body is blank or too long.</exception>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Message.CreateSharedMovie(System.Guid,System.Guid,System.Int32,System.String,System.String,System.String,System.String)">
+            <summary>Creates a message that shares a movie/series card, with an optional caption.</summary>
+            <param name="conversationId">The conversation.</param>
+            <param name="senderId">The sender.</param>
+            <param name="tmdbId">The shared title's TMDB id (must be positive).</param>
+            <param name="mediaType">The media-type token (the <c>MediaType</c> enum name), required.</param>
+            <param name="title">The shared title's display name, required.</param>
+            <param name="posterPath">The raw TMDB poster path, or <c>null</c>.</param>
+            <param name="caption">An optional caption (may be null/empty), max <see cref="F:Cinora.Domain.Entities.Message.BodyMaxLength"/> characters.</param>
+            <returns>A new <see cref="T:Cinora.Domain.Entities.Message"/> carrying the shared-movie reference.</returns>
+            <exception cref="T:Cinora.Domain.Exceptions.DomainException">Thrown when the movie coordinates are invalid or the caption is too long.</exception>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Message.MarkDeleted">
+            <summary>Soft-deletes the message (keeps the row; renders as a tombstone).</summary>
+        </member>
+        <member name="T:Cinora.Domain.Entities.Movie">
+            <summary>
+            A cached movie or series sourced from TMDB. <see cref="P:Cinora.Domain.Entities.Movie.TmdbId"/> is the stable external key
+            (unique per media type from Phase 2 onward); <see cref="P:Cinora.Domain.Entities.Movie.Id"/> is Cinora's own surrogate key so
+            other entities reference titles by an internal <see cref="T:System.Guid"/>.
+            </summary>
+        </member>
+        <member name="F:Cinora.Domain.Entities.Movie.TitleMaxLength">
+            <summary>The maximum allowed length of a <see cref="P:Cinora.Domain.Entities.Movie.Title"/>.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Movie.Id">
+            <summary>Cinora's internal identifier for the title.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Movie.TmdbId">
+            <summary>The TMDB identifier this title was sourced from.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Movie.MediaType">
+            <summary>Whether this title is a movie or a series.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Movie.Title">
+            <summary>The display title.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Movie.Overview">
+            <summary>The synopsis, or <c>null</c> when TMDB provides none.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Movie.ReleaseDate">
+            <summary>The release date, or <c>null</c> when unknown.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Movie.PosterPath">
+            <summary>The TMDB poster image path, or <c>null</c> when none exists.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Movie.BackdropPath">
+            <summary>The TMDB backdrop image path, or <c>null</c> when none exists.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Movie.CachedAtUtc">
+            <summary>The UTC instant this title's metadata was cached from TMDB.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Movie.FromTmdb(System.Int32,Cinora.Domain.Enums.MediaType,System.String,System.String,System.Nullable{System.DateTime},System.String,System.String)">
+            <summary>Creates a cached title from TMDB metadata.</summary>
+            <param name="tmdbId">The TMDB identifier; must be greater than zero.</param>
+            <param name="mediaType">Whether the title is a movie or a series.</param>
+            <param name="title">The display title; required, max <see cref="F:Cinora.Domain.Entities.Movie.TitleMaxLength"/> characters.</param>
+            <param name="overview">The synopsis, or <c>null</c>.</param>
+            <param name="releaseDate">The release date, or <c>null</c>.</param>
+            <param name="posterPath">The TMDB poster path, or <c>null</c>.</param>
+            <param name="backdropPath">The TMDB backdrop path, or <c>null</c>.</param>
+            <returns>A newly cached <see cref="T:Cinora.Domain.Entities.Movie"/>.</returns>
+        </member>
+        <member name="T:Cinora.Domain.Entities.MovieGenre">
+            <summary>
+            The many-to-many join between a <see cref="T:Cinora.Domain.Entities.Movie"/> and a <see cref="T:Cinora.Domain.Entities.Genre"/>. It has no
+            surrogate key; the pair (<see cref="P:Cinora.Domain.Entities.MovieGenre.MovieId"/>, <see cref="P:Cinora.Domain.Entities.MovieGenre.GenreId"/>) is the composite key,
+            configured by EF Core in Milestone 1.2.
+            </summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.MovieGenre.MovieId">
+            <summary>The identifier of the linked <see cref="T:Cinora.Domain.Entities.Movie"/>.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.MovieGenre.GenreId">
+            <summary>The identifier of the linked <see cref="T:Cinora.Domain.Entities.Genre"/>.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Entities.MovieGenre.Link(System.Guid,System.Guid)">
+            <summary>Links a movie to a genre.</summary>
+            <param name="movieId">The movie identifier.</param>
+            <param name="genreId">The genre identifier.</param>
+            <returns>A new <see cref="T:Cinora.Domain.Entities.MovieGenre"/> join record.</returns>
+        </member>
+        <member name="T:Cinora.Domain.Entities.Notification">
+            <summary>
+            An in-app notification delivered to a recipient about a social event (a friend request, a like,
+            a comment, and so on). <see cref="P:Cinora.Domain.Entities.Notification.TargetId"/> optionally deep-links to the related entity.
+            </summary>
+        </member>
+        <member name="F:Cinora.Domain.Entities.Notification.MessageMaxLength">
+            <summary>The maximum allowed length of a notification <see cref="P:Cinora.Domain.Entities.Notification.Message"/>.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Notification.Id">
+            <summary>The unique identifier of the notification.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Notification.RecipientUserId">
+            <summary>The identifier of the user who receives the notification.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Notification.Type">
+            <summary>The kind of event this notification represents.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Notification.ActorUserId">
+            <summary>The identifier of the user who triggered the event, or <c>null</c> for system events.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Notification.Message">
+            <summary>The human-readable notification text.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Notification.TargetId">
+            <summary>The identifier of the related entity to deep-link to (for example a review), or <c>null</c>.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Notification.IsRead">
+            <summary>Whether the recipient has read the notification.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Notification.CreatedAtUtc">
+            <summary>The UTC instant the notification was created.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Notification.Create(System.Guid,Cinora.Domain.Enums.NotificationType,System.String,System.Nullable{System.Guid},System.Nullable{System.Guid})">
+            <summary>Creates a new unread notification.</summary>
+            <param name="recipientUserId">The recipient's identifier.</param>
+            <param name="type">The kind of event.</param>
+            <param name="message">The notification text; required, max <see cref="F:Cinora.Domain.Entities.Notification.MessageMaxLength"/> characters.</param>
+            <param name="actorUserId">The triggering user's identifier, or <c>null</c> for system events.</param>
+            <param name="targetId">The related entity's identifier to deep-link to, or <c>null</c>.</param>
+            <returns>A new, unread <see cref="T:Cinora.Domain.Entities.Notification"/>.</returns>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Notification.MarkRead">
+            <summary>Marks the notification as read.</summary>
+        </member>
+        <member name="T:Cinora.Domain.Entities.Review">
+            <summary>
+            A user's review of a title: a <see cref="P:Cinora.Domain.Entities.Review.Rating"/> on the 1–10 scale plus a written body.
+            The aggregate guards a non-empty, bounded body and records when it was last edited. A user may
+            hold at most one review per title — that uniqueness is enforced by EF Core in Milestone 1.2.
+            </summary>
+        </member>
+        <member name="F:Cinora.Domain.Entities.Review.BodyMaxLength">
+            <summary>The maximum allowed length of a review <see cref="P:Cinora.Domain.Entities.Review.Body"/>.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Review.Id">
+            <summary>The unique identifier of the review.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Review.UserId">
+            <summary>The identifier of the author.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Review.MovieId">
+            <summary>The identifier of the reviewed title.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Review.Rating">
+            <summary>The 1–10 score.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Review.Body">
+            <summary>The review text.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Review.CreatedAtUtc">
+            <summary>The UTC instant the review was created.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Review.UpdatedAtUtc">
+            <summary>The UTC instant the review was last edited, or <c>null</c> if never edited.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Review.Create(System.Guid,System.Guid,Cinora.Domain.ValueObjects.Rating,System.String)">
+            <summary>Creates a new review.</summary>
+            <param name="userId">The author's identifier.</param>
+            <param name="movieId">The reviewed title's identifier.</param>
+            <param name="rating">The score; must be a valid 1–10 <see cref="P:Cinora.Domain.Entities.Review.Rating"/> (the struct default is rejected).</param>
+            <param name="body">The review text; required, max <see cref="F:Cinora.Domain.Entities.Review.BodyMaxLength"/> characters.</param>
+            <returns>A new <see cref="T:Cinora.Domain.Entities.Review"/>.</returns>
+            <exception cref="T:Cinora.Domain.Exceptions.DomainException">Thrown when <paramref name="rating"/> is invalid or <paramref name="body"/> is missing or too long.</exception>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Review.ChangeRating(Cinora.Domain.ValueObjects.Rating)">
+            <summary>Changes the review's score and marks it edited.</summary>
+            <param name="rating">The new score; must be a valid 1–10 <see cref="P:Cinora.Domain.Entities.Review.Rating"/> (the struct default is rejected).</param>
+            <exception cref="T:Cinora.Domain.Exceptions.DomainException">Thrown when <paramref name="rating"/> is invalid.</exception>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Review.EditBody(System.String)">
+            <summary>Replaces the review text and marks it edited.</summary>
+            <param name="body">The new review text; required, max <see cref="F:Cinora.Domain.Entities.Review.BodyMaxLength"/> characters.</param>
+        </member>
+        <member name="T:Cinora.Domain.Entities.ReviewLike">
+            <summary>
+            Records that a user liked a review. It has no surrogate key; the pair
+            (<see cref="P:Cinora.Domain.Entities.ReviewLike.ReviewId"/>, <see cref="P:Cinora.Domain.Entities.ReviewLike.UserId"/>) is the composite key, configured by EF Core in
+            Milestone 1.2, which also guarantees a user can like a review at most once.
+            </summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.ReviewLike.ReviewId">
+            <summary>The identifier of the liked <see cref="T:Cinora.Domain.Entities.Review"/>.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.ReviewLike.UserId">
+            <summary>The identifier of the user who liked the review.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.ReviewLike.LikedAtUtc">
+            <summary>The UTC instant the like was recorded.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Entities.ReviewLike.Create(System.Guid,System.Guid)">
+            <summary>Records a like of a review by a user.</summary>
+            <param name="reviewId">The liked review's identifier.</param>
+            <param name="userId">The liking user's identifier.</param>
+            <returns>A new <see cref="T:Cinora.Domain.Entities.ReviewLike"/>.</returns>
+        </member>
+        <member name="T:Cinora.Domain.Entities.User">
+            <summary>
+            The pure profile/social user aggregate. It carries display and visibility state only —
+            authentication data (credentials, logins, security stamp) lives on the Infrastructure
+            <c>ApplicationUser</c>, which shares this same <see cref="P:Cinora.Domain.Entities.User.Id"/> (ADR 0003). Every other domain
+            entity references a user by this <see cref="T:System.Guid"/> identifier, never by an Identity type.
+            </summary>
+        </member>
+        <member name="F:Cinora.Domain.Entities.User.DisplayNameMaxLength">
+            <summary>The maximum allowed length of a <see cref="P:Cinora.Domain.Entities.User.DisplayName"/>.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Entities.User.DefaultLanguageMaxLength">
+            <summary>The maximum length of a <see cref="P:Cinora.Domain.Entities.User.DefaultLanguage"/> code (ISO-639-1, with room for a region tag).</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.User.Id">
+            <summary>The user's unique identifier, shared with the Identity principal.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.User.DisplayName">
+            <summary>The publicly shown name for the user.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.User.NormalizedDisplayName">
+            <summary>
+            The upper-invariant normalization of <see cref="P:Cinora.Domain.Entities.User.DisplayName"/>, enforced by a unique index so it can
+            serve as a case-insensitive login handle (users sign in with display name OR email). Kept in lockstep
+            with <see cref="P:Cinora.Domain.Entities.User.DisplayName"/> by <see cref="M:Cinora.Domain.Entities.User.Create(System.Guid,System.String)"/>/<see cref="M:Cinora.Domain.Entities.User.Rename(System.String)"/>.
+            </summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.User.DefaultLanguage">
+            <summary>
+            The user's preferred movie language as a lower-case ISO-639-1 code (e.g. <c>"hi"</c>, <c>"ko"</c>), or
+            <c>null</c> for Global (no original-language filter). Used as the Discover default when set.
+            </summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.User.AvatarFileKey">
+            <summary>The storage key of the user's avatar image, or <c>null</c> when none is set.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.User.IsProfilePublic">
+            <summary>Whether the user's profile is visible to everyone.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.User.Preferences">
+            <summary>
+            The user's per-type Web Push opt-out preferences (Milestone 6.3). Defaults to all-enabled and is mapped as
+            an EF owned type (columns on the <c>Users</c> table, no join). Governs push fan-out only; the in-app inbox
+            row always persists.
+            </summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.User.CreatedAtUtc">
+            <summary>The UTC instant the profile was created.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Entities.User.Create(System.Guid,System.String)">
+            <summary>Creates a new user profile.</summary>
+            <param name="id">The identifier shared with the Identity principal (created in the same registration transaction).</param>
+            <param name="displayName">The public display name; required, max <see cref="F:Cinora.Domain.Entities.User.DisplayNameMaxLength"/> characters.</param>
+            <returns>A fully initialized, publicly visible <see cref="T:Cinora.Domain.Entities.User"/>.</returns>
+        </member>
+        <member name="M:Cinora.Domain.Entities.User.Rename(System.String)">
+            <summary>Changes the user's display name, keeping <see cref="P:Cinora.Domain.Entities.User.NormalizedDisplayName"/> in lockstep.</summary>
+            <param name="displayName">The new display name; required, max <see cref="F:Cinora.Domain.Entities.User.DisplayNameMaxLength"/> characters.</param>
+        </member>
+        <member name="M:Cinora.Domain.Entities.User.SetDefaultLanguage(System.String)">
+            <summary>Sets or clears the user's preferred movie language.</summary>
+            <param name="languageCode">A lower-cased ISO-639-1 code, or <c>null</c>/blank for Global (no filter).</param>
+        </member>
+        <member name="M:Cinora.Domain.Entities.User.Normalize(System.String)">
+            <summary>The upper-invariant normalization used for the unique, case-insensitive display-name login handle.</summary>
+            <param name="displayName">The display name to normalize.</param>
+            <returns>The trimmed, upper-invariant form.</returns>
+        </member>
+        <member name="M:Cinora.Domain.Entities.User.SetAvatar(System.String)">
+            <summary>Sets or clears the user's avatar storage key.</summary>
+            <param name="avatarFileKey">The new avatar storage key, or <c>null</c> to clear it.</param>
+        </member>
+        <member name="M:Cinora.Domain.Entities.User.SetProfileVisibility(System.Boolean)">
+            <summary>Sets whether the profile is publicly visible.</summary>
+            <param name="isProfilePublic">The new visibility.</param>
+        </member>
+        <member name="M:Cinora.Domain.Entities.User.UpdateNotificationPreferences(Cinora.Domain.ValueObjects.NotificationPreferences)">
+            <summary>Replaces the user's Web Push notification preferences (Milestone 6.3).</summary>
+            <param name="preferences">The new preferences; required.</param>
+        </member>
+        <member name="T:Cinora.Domain.Entities.UserBlock">
+            <summary>
+            A directed block: <see cref="P:Cinora.Domain.Entities.UserBlock.BlockerId"/> has blocked <see cref="P:Cinora.Domain.Entities.UserBlock.BlockedUserId"/>. Existence of the row is
+            the block (there is no status/lifecycle); unblocking deletes the row. A block is independent of the
+            <see cref="T:Cinora.Domain.Entities.Friend"/> graph — you can block someone you were never friends with — and it enforces the full
+            cut-off + hide semantics of the Friends &amp; Social overhaul (§2).
+            </summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.UserBlock.Id">
+            <summary>The unique identifier of this block record.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.UserBlock.BlockerId">
+            <summary>The user who created the block.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.UserBlock.BlockedUserId">
+            <summary>The user who is blocked.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.UserBlock.CreatedAtUtc">
+            <summary>The UTC instant the block was created.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Entities.UserBlock.Create(System.Guid,System.Guid)">
+            <summary>Creates a new block from <paramref name="blockerId"/> against <paramref name="blockedUserId"/>.</summary>
+            <param name="blockerId">The user creating the block.</param>
+            <param name="blockedUserId">The user being blocked; must differ from the blocker.</param>
+            <returns>A new <see cref="T:Cinora.Domain.Entities.UserBlock"/>.</returns>
+            <exception cref="T:Cinora.Domain.Exceptions.DomainException">Thrown when a user attempts to block themselves.</exception>
+        </member>
+        <member name="T:Cinora.Domain.Entities.Watchlist">
+            <summary>
+            An entry in a user's watchlist tracking a title and its viewing status. A user may hold at most
+            one entry per title — that uniqueness is enforced by EF Core in Milestone 1.2.
+            </summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Watchlist.Id">
+            <summary>The unique identifier of the watchlist entry.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Watchlist.UserId">
+            <summary>The identifier of the owning user.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Watchlist.MovieId">
+            <summary>The identifier of the tracked title.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Watchlist.Status">
+            <summary>The current viewing status.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Watchlist.AddedAtUtc">
+            <summary>The UTC instant the entry was added.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.Watchlist.UpdatedAtUtc">
+            <summary>The UTC instant the status last changed, or <c>null</c> if it has not changed since being added.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Watchlist.Add(System.Guid,System.Guid,Cinora.Domain.Enums.WatchlistStatus)">
+            <summary>Adds a title to a user's watchlist.</summary>
+            <param name="userId">The owning user's identifier.</param>
+            <param name="movieId">The tracked title's identifier.</param>
+            <param name="status">The initial viewing status.</param>
+            <returns>A new <see cref="T:Cinora.Domain.Entities.Watchlist"/> entry.</returns>
+        </member>
+        <member name="M:Cinora.Domain.Entities.Watchlist.ChangeStatus(Cinora.Domain.Enums.WatchlistStatus)">
+            <summary>Changes the viewing status and records the update time.</summary>
+            <param name="status">The new viewing status.</param>
+        </member>
+        <member name="T:Cinora.Domain.Enums.ConversationRole">
+            <summary>A member's role within a group conversation.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Enums.ConversationRole.Member">
+            <summary>An ordinary member: can read, send, and leave.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Enums.ConversationRole.Admin">
+            <summary>The group admin (initially the creator): can also rename and add/remove members.</summary>
+        </member>
+        <member name="T:Cinora.Domain.Enums.ConversationType">
+            <summary>Whether a <see cref="T:Cinora.Domain.Entities.Conversation"/> is a 1:1 direct chat or a named group.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Enums.ConversationType.Direct">
+            <summary>A 1:1 conversation between exactly two users (no title; derived from the other member).</summary>
+        </member>
+        <member name="F:Cinora.Domain.Enums.ConversationType.Group">
+            <summary>A named group conversation with two or more members and an admin.</summary>
+        </member>
+        <member name="T:Cinora.Domain.Enums.FriendStatus">
+            <summary>The lifecycle status of a <see cref="T:Cinora.Domain.Entities.Friend"/> relationship.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Enums.FriendStatus.Pending">
+            <summary>The request has been sent but not yet answered.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Enums.FriendStatus.Accepted">
+            <summary>The addressee accepted the request; the two users are friends.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Enums.FriendStatus.Declined">
+            <summary>The addressee declined the request.</summary>
+        </member>
+        <member name="T:Cinora.Domain.Enums.MediaType">
+            <summary>The kind of catalogued title a <see cref="T:Cinora.Domain.Entities.Movie"/> represents.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Enums.MediaType.Movie">
+            <summary>A feature film.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Enums.MediaType.Series">
+            <summary>A multi-episode television or streaming series.</summary>
+        </member>
+        <member name="T:Cinora.Domain.Enums.NotificationType">
+            <summary>The kind of event a <see cref="T:Cinora.Domain.Entities.Notification"/> informs the recipient about.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Enums.NotificationType.FriendRequest">
+            <summary>Another user sent the recipient a friend request.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Enums.NotificationType.FriendAccepted">
+            <summary>Another user accepted the recipient's friend request.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Enums.NotificationType.ReviewLiked">
+            <summary>Another user liked one of the recipient's reviews.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Enums.NotificationType.CommentAdded">
+            <summary>Another user commented on one of the recipient's reviews.</summary>
+        </member>
+        <member name="T:Cinora.Domain.Enums.WatchlistStatus">
+            <summary>Where a title sits in a user's <see cref="T:Cinora.Domain.Entities.Watchlist"/>.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Enums.WatchlistStatus.PlanToWatch">
+            <summary>The user intends to watch the title.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Enums.WatchlistStatus.Watching">
+            <summary>The user is currently watching the title.</summary>
+        </member>
+        <member name="F:Cinora.Domain.Enums.WatchlistStatus.Watched">
+            <summary>The user has finished watching the title.</summary>
+        </member>
+        <member name="T:Cinora.Domain.Exceptions.DomainException">
+            <summary>
+            Raised when a domain invariant is violated — for example an out-of-range rating, an invalid
+            state transition, or a missing required value. The Application layer maps this exception to a
+            validation (HTTP 400) response at its boundary; it never leaks a stack trace to the client.
+            </summary>
+        </member>
+        <member name="M:Cinora.Domain.Exceptions.DomainException.#ctor">
+            <summary>Initializes a new <see cref="T:Cinora.Domain.Exceptions.DomainException"/> with a default message.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Exceptions.DomainException.#ctor(System.String)">
+            <summary>Initializes a new <see cref="T:Cinora.Domain.Exceptions.DomainException"/> with the specified message.</summary>
+            <param name="message">A human-readable description of the invariant that was violated.</param>
+        </member>
+        <member name="M:Cinora.Domain.Exceptions.DomainException.#ctor(System.String,System.Exception)">
+            <summary>Initializes a new <see cref="T:Cinora.Domain.Exceptions.DomainException"/> with a message and inner exception.</summary>
+            <param name="message">A human-readable description of the invariant that was violated.</param>
+            <param name="innerException">The underlying exception that caused this one.</param>
+        </member>
+        <member name="T:Cinora.Domain.ValueObjects.NotificationPreferences">
+             <summary>
+             A user's per-type Web Push opt-out preferences (Milestone 6.3, ADR 0020 §4 / un-defers ADR 0015). A pure,
+             immutable value object owned by <see cref="T:Cinora.Domain.Entities.User"/> — four booleans, one per <see cref="T:Cinora.Domain.Enums.NotificationType"/>,
+             each <b>default <see langword="true"/></b> (opt-out semantics: a subscriber receives push for every type until
+             they mute one). It carries <b>no persistence concern</b>; the EF owned-type mapping lives in Infrastructure.
+            
+             Scope is deliberately <b>push only</b>: the in-app inbox row and the SignalR live toast are always delivered
+             (the inbox is the authoritative source of truth, ADR 0011); only the out-of-app push fan-out consults
+             <see cref="M:Cinora.Domain.ValueObjects.NotificationPreferences.IsPushEnabled(Cinora.Domain.Enums.NotificationType)"/>. A future email / in-app-mute channel would migrate to a
+             per-<c>(UserId, Channel, Type)</c> entity (recorded in ADR 0020, not built).
+             </summary>
+             <param name="PushFriendRequests">Whether a <see cref="F:Cinora.Domain.Enums.NotificationType.FriendRequest"/> event pushes.</param>
+             <param name="PushFriendAccepted">Whether a <see cref="F:Cinora.Domain.Enums.NotificationType.FriendAccepted"/> event pushes.</param>
+             <param name="PushReviewLikes">Whether a <see cref="F:Cinora.Domain.Enums.NotificationType.ReviewLiked"/> event pushes.</param>
+             <param name="PushComments">Whether a <see cref="F:Cinora.Domain.Enums.NotificationType.CommentAdded"/> event pushes.</param>
+        </member>
+        <member name="M:Cinora.Domain.ValueObjects.NotificationPreferences.#ctor(System.Boolean,System.Boolean,System.Boolean,System.Boolean)">
+             <summary>
+             A user's per-type Web Push opt-out preferences (Milestone 6.3, ADR 0020 §4 / un-defers ADR 0015). A pure,
+             immutable value object owned by <see cref="T:Cinora.Domain.Entities.User"/> — four booleans, one per <see cref="T:Cinora.Domain.Enums.NotificationType"/>,
+             each <b>default <see langword="true"/></b> (opt-out semantics: a subscriber receives push for every type until
+             they mute one). It carries <b>no persistence concern</b>; the EF owned-type mapping lives in Infrastructure.
+            
+             Scope is deliberately <b>push only</b>: the in-app inbox row and the SignalR live toast are always delivered
+             (the inbox is the authoritative source of truth, ADR 0011); only the out-of-app push fan-out consults
+             <see cref="M:Cinora.Domain.ValueObjects.NotificationPreferences.IsPushEnabled(Cinora.Domain.Enums.NotificationType)"/>. A future email / in-app-mute channel would migrate to a
+             per-<c>(UserId, Channel, Type)</c> entity (recorded in ADR 0020, not built).
+             </summary>
+             <param name="PushFriendRequests">Whether a <see cref="F:Cinora.Domain.Enums.NotificationType.FriendRequest"/> event pushes.</param>
+             <param name="PushFriendAccepted">Whether a <see cref="F:Cinora.Domain.Enums.NotificationType.FriendAccepted"/> event pushes.</param>
+             <param name="PushReviewLikes">Whether a <see cref="F:Cinora.Domain.Enums.NotificationType.ReviewLiked"/> event pushes.</param>
+             <param name="PushComments">Whether a <see cref="F:Cinora.Domain.Enums.NotificationType.CommentAdded"/> event pushes.</param>
+        </member>
+        <member name="P:Cinora.Domain.ValueObjects.NotificationPreferences.PushFriendRequests">
+            <summary>Whether a <see cref="F:Cinora.Domain.Enums.NotificationType.FriendRequest"/> event pushes.</summary>
+        </member>
+        <member name="P:Cinora.Domain.ValueObjects.NotificationPreferences.PushFriendAccepted">
+            <summary>Whether a <see cref="F:Cinora.Domain.Enums.NotificationType.FriendAccepted"/> event pushes.</summary>
+        </member>
+        <member name="P:Cinora.Domain.ValueObjects.NotificationPreferences.PushReviewLikes">
+            <summary>Whether a <see cref="F:Cinora.Domain.Enums.NotificationType.ReviewLiked"/> event pushes.</summary>
+        </member>
+        <member name="P:Cinora.Domain.ValueObjects.NotificationPreferences.PushComments">
+            <summary>Whether a <see cref="F:Cinora.Domain.Enums.NotificationType.CommentAdded"/> event pushes.</summary>
+        </member>
+        <member name="P:Cinora.Domain.ValueObjects.NotificationPreferences.Default">
+            <summary>
+            The all-enabled default (every push type on). Returns a fresh instance on each access so a persisted
+            <see cref="T:Cinora.Domain.Entities.User"/> never shares one owned-value instance with another tracked owner (an EF
+            owned-type constraint). Value-equal to any other all-true instance.
+            </summary>
+        </member>
+        <member name="M:Cinora.Domain.ValueObjects.NotificationPreferences.IsPushEnabled(Cinora.Domain.Enums.NotificationType)">
+            <summary>Whether push is enabled for a given notification type.</summary>
+            <param name="type">The notification event type.</param>
+            <returns>The matching per-type flag; an unknown/future type defaults to <see langword="true"/> (opt-out semantics).</returns>
+        </member>
+        <member name="M:Cinora.Domain.ValueObjects.NotificationPreferences.With(Cinora.Domain.Enums.NotificationType,System.Boolean)">
+            <summary>Returns a new value with the flag for one notification type set, leaving the others unchanged.</summary>
+            <param name="type">The notification event type whose flag to change.</param>
+            <param name="enabled">The new value for that type's push flag.</param>
+            <returns>A new <see cref="T:Cinora.Domain.ValueObjects.NotificationPreferences"/> (this instance is never mutated).</returns>
+        </member>
+        <member name="T:Cinora.Domain.ValueObjects.Rating">
+            <summary>
+            A movie/series score on Cinora's 1–10 scale. An immutable value object with value equality:
+            two ratings are equal when their <see cref="P:Cinora.Domain.ValueObjects.Rating.Value"/> is equal. All valid ratings must be created
+            through <see cref="M:Cinora.Domain.ValueObjects.Rating.From(System.Int32)"/>, which enforces the 1–10 invariant. Because this is a readonly
+            record struct, the struct default (<c>default(Rating)</c> or <c>new Rating()</c>) bypasses
+            <see cref="M:Cinora.Domain.ValueObjects.Rating.From(System.Int32)"/> and holds <see cref="P:Cinora.Domain.ValueObjects.Rating.Value"/> <c>0</c>, which is NOT a valid rating;
+            consumers must reject it via <see cref="P:Cinora.Domain.ValueObjects.Rating.IsValid"/>.
+            </summary>
+        </member>
+        <member name="F:Cinora.Domain.ValueObjects.Rating.MinValue">
+            <summary>The lowest score a rating may hold.</summary>
+        </member>
+        <member name="F:Cinora.Domain.ValueObjects.Rating.MaxValue">
+            <summary>The highest score a rating may hold.</summary>
+        </member>
+        <member name="P:Cinora.Domain.ValueObjects.Rating.Value">
+            <summary>The score, guaranteed to be between <see cref="F:Cinora.Domain.ValueObjects.Rating.MinValue"/> and <see cref="F:Cinora.Domain.ValueObjects.Rating.MaxValue"/> inclusive.</summary>
+        </member>
+        <member name="P:Cinora.Domain.ValueObjects.Rating.IsValid">
+            <summary>
+            Whether this rating holds a score within the valid <see cref="F:Cinora.Domain.ValueObjects.Rating.MinValue"/>–<see cref="F:Cinora.Domain.ValueObjects.Rating.MaxValue"/>
+            range. Returns <see langword="false"/> for the struct default (<c>default(Rating)</c> /
+            <c>new Rating()</c>), which bypasses <see cref="M:Cinora.Domain.ValueObjects.Rating.From(System.Int32)"/>.
+            </summary>
+        </member>
+        <member name="M:Cinora.Domain.ValueObjects.Rating.From(System.Int32)">
+            <summary>Creates a <see cref="T:Cinora.Domain.ValueObjects.Rating"/> from a raw score.</summary>
+            <param name="value">The score; must be between 1 and 10 inclusive.</param>
+            <returns>A valid <see cref="T:Cinora.Domain.ValueObjects.Rating"/>.</returns>
+            <exception cref="T:Cinora.Domain.Exceptions.DomainException">Thrown when <paramref name="value"/> is outside 1–10.</exception>
+        </member>
+    </members>
+</doc>

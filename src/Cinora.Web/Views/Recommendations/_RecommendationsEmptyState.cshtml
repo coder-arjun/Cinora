@@ -1,0 +1,15 @@
+@*
+    Milestone 5.4 fix — the honest "still learning your taste" empty-state COPY (never an error), shared by two
+    surfaces so the wording lives ONCE and can't drift:
+      * the initial server-rendered empty page (Index.cshtml, wrapped in data-rec-empty), and
+      * the hidden client-revealed stub the /recommendations dismiss handler unhides once EVERY card has been
+        dismissed (Index.cshtml, wrapped in data-rec-live-empty).
+    No model — pure static copy. The heading is an <h2> so it nests correctly under the page <h1>.
+*@
+<h2 class="font-display text-2xl text-ink">We&rsquo;re still learning your taste</h2>
+<p class="mx-auto mt-3 max-w-md text-sm text-ink-muted">
+    Rate or add a few titles to your watchlist and your personalized picks will show up here.
+</p>
+<div class="mt-6 flex justify-center">
+    <a asp-controller="Discovery" asp-action="Index" class="btn btn-primary text-sm">Discover titles</a>
+</div>

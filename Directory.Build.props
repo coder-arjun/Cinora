@@ -1,0 +1,19 @@
+<Project>
+
+  <!--
+    Repo-root shared build configuration for all Cinora projects (src + tests).
+    Authoritative source: docs/architecture/solution-structure.md §2.
+    Nearer Directory.Build.props files (src/, tests/) import this one and add scoped settings.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+</Project>

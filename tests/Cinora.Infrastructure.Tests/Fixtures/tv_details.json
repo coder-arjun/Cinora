@@ -1,0 +1,21 @@
+{
+  "id": 1396,
+  "name": "Breaking Bad",
+  "overview": "Walter White, a New Mexico chemistry teacher, is diagnosed with cancer and turns to a life of crime.",
+  "tagline": "Change the equation.",
+  "poster_path": "/breaking_bad_poster.jpg",
+  "backdrop_path": "/breaking_bad_backdrop.jpg",
+  "first_air_date": "2008-01-20",
+  "vote_average": 8.9,
+  "vote_count": 14000,
+  "episode_run_time": [45, 47],
+  "genres": [
+    { "id": 18, "name": "Drama" },
+    { "id": 80, "name": "Crime" }
+  ],
+  "credits": {
+    "cast": [
+      { "id": 17419, "name": "Bryan Cranston", "character": "Walter White", "profile_path": "/bryan.jpg", "order": 0 }
+    ]
+  }
+}

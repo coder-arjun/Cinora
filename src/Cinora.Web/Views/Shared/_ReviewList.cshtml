@@ -1,0 +1,47 @@
+@model ReviewListVm
+@{
+    var reviews = Model.Reviews;
+    var mediaSegment = Model.Media.ToString().ToLowerInvariant();
+
+    string? nextUrl = null;
+    if (reviews.HasMore && reviews.NextCursor is { } cursor)
+    {
+        nextUrl = Url.Action("Reviews", "Discovery", new
+        {
+            media = mediaSegment,
+            tmdbId = Model.TmdbId,
+            cursorCreatedAt = cursor.CreatedAtUtc.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+            cursorId = cursor.Id,
+        });
+    }
+}
+
+@*
+    Milestone 3.1 — the public reviews list region (first page; partial, NO layout). Lazy-loaded into the
+    Details page and advanced by a self-replacing HTMX sentinel that reuses the 2.4 keyset/sentinel grammar
+    (hx-trigger="revealed" / hx-swap="outerHTML" / terminal state). The public list is addressed by
+    (media, tmdbId); the sentinel carries the opaque (cursorCreatedAt, cursorId) keyset cursor. All HTMX is
+    attribute-driven — no hx-on, no inline JS — so the strict CSP is untouched.
+*@
+@if (reviews.Items.Count == 0)
+{
+    <div class="card-glass px-6 py-8 text-center">
+        <p class="text-sm text-ink-muted">No reviews yet. Be the first to rate this title.</p>
+    </div>
+}
+else
+{
+    <div id="reviews-list-items" class="space-y-4">
+        @foreach (var review in reviews.Items)
+        {
+            <partial name="_ReviewCard" model="review" />
+        }
+
+        @if (nextUrl is not null)
+        {
+            <div hx-get="@nextUrl" hx-trigger="revealed" hx-swap="outerHTML" aria-hidden="true">
+                <div class="skeleton-shimmer h-28 rounded-card"></div>
+            </div>
+        }
+    </div>
+}

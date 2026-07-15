@@ -1,0 +1,24 @@
+@model Cinora.Application.Features.Chat.MessageThreadVm
+@*
+    §6/§12 — one keyset page of messages. The query returns newest-first; the view renders oldest-at-top (so the
+    thread reads top→bottom) by reversing in memory. When an older page exists, a "load older" trigger sits at the
+    top: HTMX GETs the previous keyset page and prepends it. Returned on its own for the load-more swap, and
+    included by _ThreadPanel for the initial page.
+*@
+@{
+    var ordered = Model.Messages.Reverse().ToList();
+}
+@if (Model.HasMore && Model.NextCursorSentAt is not null && Model.NextCursorId is not null)
+{
+    var conversationId = ViewContext.RouteData.Values["id"]?.ToString();
+    <div class="flex justify-center py-2"
+         hx-get="@($"/chat/{conversationId}/messages?cursorSentAt={Uri.EscapeDataString(Model.NextCursorSentAt.Value.ToString("o"))}&cursorId={Model.NextCursorId}")"
+         hx-trigger="revealed"
+         hx-swap="outerHTML">
+        <span class="text-xs text-ink-subtle">Loading older messages…</span>
+    </div>
+}
+@foreach (var message in ordered)
+{
+    <partial name="_ChatMessage" model="message" />
+}

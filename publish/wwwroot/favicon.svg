@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Cinora">
+  <defs>
+    <linearGradient id="cinoraGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4d488"/>
+      <stop offset="1" stop-color="#d9a02c"/>
+    </linearGradient>
+    <linearGradient id="cinoraTile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#171a22"/>
+      <stop offset="1" stop-color="#0a0c11"/>
+    </linearGradient>
+    <radialGradient id="cinoraGlow" cx="0.5" cy="0.46" r="0.55">
+      <stop offset="0" stop-color="#ebbd57" stop-opacity="0.30"/>
+      <stop offset="0.7" stop-color="#ebbd57" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#ebbd57" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="1.25" y="1.25" width="29.5" height="29.5" rx="8" fill="url(#cinoraTile)" stroke="#ebbd57" stroke-opacity="0.22"/>
+  <circle cx="16" cy="15.4" r="10.5" fill="url(#cinoraGlow)"/>
+  <path d="M22.78 20.24 A8 8 0 1 1 22.78 11.76" fill="none" stroke="url(#cinoraGold)" stroke-width="3.3" stroke-linecap="round"/>
+  <path d="M13.5 12.5 L19 16 L13.5 19.5 Z" fill="url(#cinoraGold)"/>
+</svg>

@@ -1,0 +1,147 @@
+@model ProfileVm
+
+@*
+    Milestone 3.3 — the relationship-reflecting control on a profile, wrapped in #profile-friend-control so each
+    HTMX action can swap the whole control (outerHTML). Owner → a link to manage friends; accepted friend →
+    Remove; an incoming request → Accept/Decline (targets the request id); an outgoing request → a "Requested"
+    badge; otherwise → the Add friend form. All actions are attribute-driven HTMX with the anti-forgery token on
+    the RequestVerificationToken header (Scripts/site.ts) — no inline JS, strict CSP untouched.
+
+    Milestone B1.5 — blocking. Every non-owner arm carries a quiet, icon-only "Block" affordance (kebab/secondary
+    position — never competing with the primary relationship action) that gates on the same CSP-safe styled
+    confirm dialog (data-confirm-* → Scripts/site.ts → _ConfirmDialog.cshtml, Phase 6.5) the Remove button above
+    already uses; NOT the native window.confirm. A dedicated ProfileRelationship.BlockedByMe arm renders ONLY an
+    Unblock control — GetProfileQuery already withholds all of the owner's content for that relationship (§7).
+*@
+<div id="profile-friend-control" class="flex flex-wrap items-center gap-2">
+    @switch (Model.Relationship)
+    {
+        case ProfileRelationship.Owner:
+            <a class="btn btn-ghost text-sm" asp-controller="Friends" asp-action="Index">Manage friends</a>
+            break;
+
+        case ProfileRelationship.Friend:
+            <span class="inline-flex items-center gap-1.5 rounded-pill border border-white/10 bg-surface-2/60 px-3 py-1.5 text-sm font-medium text-ink">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4 text-accent" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4l2.3 2.29 6.3-6.29a1 1 0 011.4 0z" clip-rule="evenodd" />
+                </svg>
+                Friends
+            </span>
+            <button type="button"
+                    class="inline-flex min-h-9 items-center rounded-btn px-3 py-1.5 text-sm font-medium text-danger/90 transition-colors hover:bg-danger/10 hover:text-danger"
+                    hx-delete="/friends/@Model.UserId"
+                    hx-target="#profile-friend-control"
+                    hx-swap="outerHTML"
+                    data-confirm-title="Remove friend?"
+                    data-confirm-message="Remove @Model.DisplayName from your friends? You can send a new request later."
+                    data-confirm-action="Remove"
+                    data-confirm-tone="danger">
+                Remove
+            </button>
+            <button type="button"
+                    class="ml-auto inline-flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-btn p-2 text-ink-subtle transition-colors hover:bg-danger/10 hover:text-danger"
+                    hx-post="/friends/@Model.UserId/block"
+                    hx-target="#profile-friend-control"
+                    hx-swap="outerHTML"
+                    aria-label="Block @Model.DisplayName"
+                    data-confirm-title="Block @Model.DisplayName?"
+                    data-confirm-message="They won't be able to find you, message you, or send you a request, and you'll stop seeing each other's activity. You can unblock them anytime."
+                    data-confirm-action="Block"
+                    data-confirm-tone="danger">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 10-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
+                </svg>
+            </button>
+            break;
+
+        case ProfileRelationship.RequestIncoming:
+            <span class="text-sm text-ink-muted">@Model.DisplayName sent you a request</span>
+            <button type="button" class="btn btn-primary text-sm"
+                    hx-post="/friends/requests/@Model.IncomingRequestId/accept"
+                    hx-target="#profile-friend-control"
+                    hx-swap="outerHTML">
+                Accept
+            </button>
+            <button type="button" class="btn btn-ghost text-sm"
+                    hx-post="/friends/requests/@Model.IncomingRequestId/decline"
+                    hx-target="#profile-friend-control"
+                    hx-swap="outerHTML">
+                Decline
+            </button>
+            <button type="button"
+                    class="ml-auto inline-flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-btn p-2 text-ink-subtle transition-colors hover:bg-danger/10 hover:text-danger"
+                    hx-post="/friends/@Model.UserId/block"
+                    hx-target="#profile-friend-control"
+                    hx-swap="outerHTML"
+                    aria-label="Block @Model.DisplayName"
+                    data-confirm-title="Block @Model.DisplayName?"
+                    data-confirm-message="They won't be able to find you, message you, or send you a request, and you'll stop seeing each other's activity. You can unblock them anytime."
+                    data-confirm-action="Block"
+                    data-confirm-tone="danger">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 10-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
+                </svg>
+            </button>
+            break;
+
+        case ProfileRelationship.RequestOutgoing:
+            <span class="inline-flex items-center rounded-pill border border-white/10 bg-surface-2/60 px-3 py-1.5 text-sm font-medium text-ink-subtle">
+                Request sent
+            </span>
+            <button type="button"
+                    class="ml-auto inline-flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-btn p-2 text-ink-subtle transition-colors hover:bg-danger/10 hover:text-danger"
+                    hx-post="/friends/@Model.UserId/block"
+                    hx-target="#profile-friend-control"
+                    hx-swap="outerHTML"
+                    aria-label="Block @Model.DisplayName"
+                    data-confirm-title="Block @Model.DisplayName?"
+                    data-confirm-message="They won't be able to find you, message you, or send you a request, and you'll stop seeing each other's activity. You can unblock them anytime."
+                    data-confirm-action="Block"
+                    data-confirm-tone="danger">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 10-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
+                </svg>
+            </button>
+            break;
+
+        case ProfileRelationship.BlockedByMe:
+            @* The viewer has blocked this user — GetProfileQuery already withholds their content, so the only
+               control offered is the way back out. Styled as the single primary CTA, exactly like the "Add
+               friend" / "Accept" affordances above for a lone-action state. *@
+            <span class="text-sm text-ink-muted">You've blocked @Model.DisplayName.</span>
+            <button type="button"
+                    class="btn btn-primary text-sm"
+                    hx-delete="/friends/@Model.UserId/block"
+                    hx-target="#profile-friend-control"
+                    hx-swap="outerHTML">
+                Unblock
+            </button>
+            break;
+
+        default:
+            @* No relationship — offer to send a request. The MVC form tag helper injects the hidden
+               __RequestVerificationToken (no-JS baseline); under HTMX the control swaps itself with the result. *@
+            <form asp-controller="Friends" asp-action="Send" method="post"
+                  hx-post="/friends/requests"
+                  hx-target="#profile-friend-control"
+                  hx-swap="outerHTML">
+                <input type="hidden" name="AddresseeUserId" value="@Model.UserId" />
+                <button type="submit" class="btn btn-primary text-sm">Add friend</button>
+            </form>
+            <button type="button"
+                    class="ml-auto inline-flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-btn p-2 text-ink-subtle transition-colors hover:bg-danger/10 hover:text-danger"
+                    hx-post="/friends/@Model.UserId/block"
+                    hx-target="#profile-friend-control"
+                    hx-swap="outerHTML"
+                    aria-label="Block @Model.DisplayName"
+                    data-confirm-title="Block @Model.DisplayName?"
+                    data-confirm-message="They won't be able to find you, message you, or send you a request, and you'll stop seeing each other's activity. You can unblock them anytime."
+                    data-confirm-action="Block"
+                    data-confirm-tone="danger">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 10-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
+                </svg>
+            </button>
+            break;
+    }
+</div>

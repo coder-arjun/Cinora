@@ -1,0 +1,68 @@
+# .NET / Cinora .gitignore
+# NOTE: this file is created as a plain file only. Version control is the human's responsibility;
+# no git commands are ever run by the tooling.
+
+## Build results
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+artifacts/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Ll]og/
+[Ll]ogs/
+
+## .NET / MSBuild
+project.lock.json
+project.fragment.lock.json
+*.binlog
+*.nupkg
+*.snupkg
+.packages/
+msbuild.log
+msbuild.err
+msbuild.wrn
+
+## Rider / Visual Studio / VS Code
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+.vscode/
+
+## ASP.NET / secrets — never commit secrets
+# User-secrets live outside the repo (%APPDATA%\Microsoft\UserSecrets), but ignore any strays:
+secrets.json
+appsettings.*.local.json
+*.pfx
+*.key
+
+## Node / frontend build (Tailwind + TypeScript, arrives in milestone 1.6)
+node_modules/
+npm-debug.log*
+yarn-error.log*
+wwwroot/dist/
+*.tsbuildinfo
+
+## Test / coverage results
+[Tt]est[Rr]esult*/
+[Cc]overage*/
+*.coverage
+*.coveragexml
+coverage.cobertura.xml
+coverage.opencover.xml
+TestResults/
+
+## OS / misc
+.DS_Store
+Thumbs.db
+*.tmp

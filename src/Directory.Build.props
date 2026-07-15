@@ -1,0 +1,15 @@
+<Project>
+
+  <!--
+    src-only build settings. Imports the repo-root Directory.Build.props, then layers on
+    settings that must NOT apply to test projects. GenerateDocumentationFile is scoped here
+    (per solution-structure.md §2) so XML-doc / bad-reference warnings surface on production
+    code without spamming the test projects.
+  -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>

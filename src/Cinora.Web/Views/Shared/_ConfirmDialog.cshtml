@@ -1,0 +1,33 @@
+@*
+    Milestone 6.5 (backlog 3.1) — the shared styled delete-confirmation dialog. Rendered ONCE by _Layout, it
+    replaces the native window.confirm / hx-confirm on destructive actions (delete review, delete comment, remove
+    friend, remove avatar) with a CSP-safe dark-glass modal.
+
+    HOW it stays CSP-clean: it is a bare-name @alpinejs/csp component (Scripts/components/confirmDialog.ts,
+    registered before Alpine.start) — only x-data / x-ref / x-on:click / x-on:keydown, no inline JS, no hx-on, no
+    inline style — so the strict `script-src 'self'` / `style-src 'self'` CSP is untouched. It is DRIVEN by the
+    HTMX `htmx:confirm` event (Scripts/site.ts): the confirm merely GATES the exact same hx-delete/hx-post +
+    anti-forgery request (re-issued via event.detail.issueRequest on confirm) — the endpoint/token flow is never
+    changed. All dynamic text (title/message/action) is set via textContent (never innerHTML), so a friend's
+    display name inside the message can never inject markup.
+
+    A11y: role="dialog" + aria-modal="true", labelled by the title and described by the message; site.ts moves
+    focus into the dialog on open (onto the safe Cancel action), Esc cancels, Tab is focus-trapped, and focus is
+    restored to the trigger on close (site.ts then re-homes focus after any ensuing HTMX swap). Progressive
+    enhancement: with no JS the destructive buttons are inert (they are HTMX-only today — unchanged from before);
+    if the component can't load, requestConfirmation falls back to window.confirm so nothing destructive is ever
+    issued unconfirmed. Hidden by default (.confirm-overlay is display:none until .is-open), so it never reaches
+    into the page while closed.
+*@
+<div id="confirm-dialog" x-data="confirmDialog" x-cloak class="confirm-overlay" x-on:keydown="onKeydown">
+    <div class="confirm-backdrop" x-on:click="cancel" aria-hidden="true"></div>
+    <div x-ref="panel" role="dialog" aria-modal="true"
+         aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-message" class="confirm-panel">
+        <h2 id="confirm-dialog-title" x-ref="title" class="confirm-title">Are you sure?</h2>
+        <p id="confirm-dialog-message" x-ref="message" class="confirm-message"></p>
+        <div class="confirm-actions">
+            <button type="button" x-ref="cancel" x-on:click="cancel" class="btn btn-ghost text-sm">Cancel</button>
+            <button type="button" x-ref="confirm" x-on:click="confirm" class="btn btn-danger text-sm">Delete</button>
+        </div>
+    </div>
+</div>

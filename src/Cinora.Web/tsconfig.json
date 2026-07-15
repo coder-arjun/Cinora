@@ -1,0 +1,29 @@
+{
+  // Type-checking config for the frontend TypeScript. esbuild performs the actual transpile/bundle;
+  // `tsc --noEmit` (run by `npm run typecheck`, gated in `npm run build`) enforces strictness.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": [],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["Scripts/**/*.ts"],
+  // The service worker is checked separately against the WebWorker lib (tsconfig.sw.json); it must NOT be
+  // checked here against the DOM lib (its ServiceWorkerGlobalScope globals would error).
+  "exclude": ["Scripts/sw.ts"]
+}

@@ -1,0 +1,12 @@
+@*
+    Milestone 5.4 — the For-You rail's QUIET fallback. Returned with HTTP 200 (never a 500) so HTMX swaps it in
+    place of the shimmering skeleton — HTMX will not swap a non-2xx. The rail is a NON-CRITICAL bonus above the
+    friends feed, so a serve failure degrades to a calm one-liner (not the alarming _RailError alert + Retry the
+    discovery rails use); the feed below is unaffected. Rendered with aria-busy="false" so the region stops
+    reporting itself busy (WCAG 4.1.2). No interactive control, no inline JS → the strict CSP is untouched.
+*@
+@* This root REPLACES the /home swap target, so it re-declares the band's top margin (mt-10 now lives on the
+   target, not a wrapping section) — the quiet one-liner sits where the rail would, not against the header. *@
+<div data-rec-region aria-busy="false" class="mt-10 py-2 sm:mt-12">
+    <p class="text-sm text-ink-subtle">Your recommendations aren&#39;t available right now.</p>
+</div>

@@ -1,0 +1,38 @@
+@model RailErrorViewModel
+
+@*
+    Milestone 2.3 — a rail's FAILURE state (the /review-ui HIGH fix). Returned with HTTP 200 (NOT a 500) so
+    HTMX swaps it in place of the shimmering skeleton — HTMX never swaps a non-2xx response. Rendered with
+    aria-busy="false" so the region stops reporting itself busy (WCAG 4.1.2). The Retry control re-fires THIS
+    exact rail's lazy load with attribute-driven HTMX only (hx-get + hx-target + hx-swap) — no inline JS and
+    no hx-on, so the strict `script-src 'self'` CSP is never touched.
+*@
+<div data-rail-error role="alert" aria-live="polite" aria-busy="false"
+     class="my-5 flex flex-col items-start gap-4 rounded-card border border-white/10 bg-surface-1/60 px-5 py-6 backdrop-blur-glass sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex items-start gap-3">
+        <svg viewBox="0 0 20 20" fill="currentColor" class="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden="true">
+            <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.515 2.625H3.72c-1.345 0-2.188-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+        </svg>
+        <div>
+            <p class="text-sm font-medium text-ink">Couldn&#39;t load this row.</p>
+            <p class="mt-0.5 text-sm text-ink-muted">Something went wrong reaching the catalogue.</p>
+        </div>
+    </div>
+
+    @*
+        Retry = attribute-driven HTMX. Re-GET this same rail (kind/media echoed back) and replace THIS error
+        block (closest [data-rail-error]) with the result — the loaded _Rail on success, or this partial
+        again on a repeat failure. A real <button> → keyboard-operable with the global gold focus ring; the
+        .btn-ghost edge meets non-text contrast. No hx-on / no inline JS → CSP-safe.
+    *@
+    <button type="button"
+            hx-get="@Url.Action("Rail", "Discovery", new { kind = Model.Kind, media = Model.Media })"
+            hx-target="closest [data-rail-error]"
+            hx-swap="outerHTML"
+            class="btn btn-ghost shrink-0 text-sm">
+        <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+            <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h1.633a.75.75 0 000-1.5H3.669a.75.75 0 00-.75.75v3.762a.75.75 0 001.5 0v-1.898l.296.297a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V3.409a.75.75 0 00-1.5 0v1.898l-.296-.297A7 7 0 003.489 8.15a.75.75 0 101.449.39 5.5 5.5 0 019.201-2.466l.312.311H12.82a.75.75 0 000 1.5h3.762a.75.75 0 00.53-.219z" clip-rule="evenodd" />
+        </svg>
+        Retry
+    </button>
+</div>

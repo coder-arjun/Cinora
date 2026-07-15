@@ -1,0 +1,111 @@
+@using Cinora.Web.ViewModels.Common
+@model Cinora.Web.ViewModels.Chat.ChatPageVm
+@{
+    ViewData["Title"] = "Chat";
+    var hasActive = Model.ActiveThread is not null;
+    var activeId = Model.ActiveThread?.Header.Id.ToString() ?? string.Empty;
+    // Shared with _GroupPanel (rendered via _ThreadPanel) so its "add members" picker can list addable friends.
+    ViewData["ChatFriends"] = Model.Friends;
+}
+@*
+    §6 — the premium two-pane chat surface. Left: the conversation list (+ New group). Right: the open thread or a
+    placeholder. On mobile only one pane shows at a time (list, or the thread when one is open). All interactivity
+    (realtime, emoji, typing, read, modals) is wired by Scripts/components/chat.ts off #chat-root — no inline JS,
+    strict CSP untouched. All names/messages are Razor @-encoded.
+*@
+<section id="chat-root" data-active-conversation-id="@activeId"
+         data-current-user-id="@(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value)"
+         class="mx-auto flex h-[calc(100dvh-9rem)] min-h-[30rem] w-full max-w-6xl gap-4 px-3 py-4 sm:px-6">
+    @* Left — conversation list *@
+    <aside class="@(hasActive ? "hidden md:flex" : "flex") w-full flex-col md:w-[22rem] md:shrink-0">
+        <div class="card-glass flex h-full min-h-0 flex-col overflow-hidden">
+            <div class="flex items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
+                <h1 class="font-display text-xl text-ink">Messages</h1>
+                <button type="button" data-chat-action="open-new-group"
+                        class="inline-flex items-center gap-1.5 rounded-btn bg-accent/15 px-2.5 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/25">
+                    <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path d="M10 4a1 1 0 011 1v4h4a1 1 0 110 2h-4v4a1 1 0 11-2 0v-4H5a1 1 0 110-2h4V5a1 1 0 011-1z" /></svg>
+                    New group
+                </button>
+            </div>
+            <div class="flex-1 space-y-1.5 overflow-y-auto p-2.5">
+                @if (Model.Conversations.Count == 0)
+                {
+                    <div class="px-4 py-10 text-center">
+                        <p class="text-sm text-ink-muted">No conversations yet.</p>
+                        <p class="mt-1 text-xs text-ink-subtle">Start one from a friend's profile, or create a group.</p>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var conversation in Model.Conversations)
+                    {
+                        <partial name="_ConversationRow" model="conversation" />
+                    }
+                }
+            </div>
+        </div>
+    </aside>
+
+    @* Right — the open thread or a placeholder *@
+    <div class="@(hasActive ? "flex" : "hidden md:flex") min-w-0 flex-1">
+        <div class="card-glass h-full w-full overflow-hidden">
+            @if (Model.ActiveThread is not null)
+            {
+                <partial name="_ThreadPanel" model="Model.ActiveThread" />
+            }
+            else
+            {
+                <div class="flex h-full flex-col items-center justify-center px-6 text-center">
+                    <span class="flex h-16 w-16 items-center justify-center rounded-pill border border-white/10 bg-surface-2/60 text-ink-subtle" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-7 w-7"><path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3v-3H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" stroke-linejoin="round" /></svg>
+                    </span>
+                    <p class="mt-4 font-display text-lg text-ink">Your messages</p>
+                    <p class="mt-1 text-sm text-ink-subtle">Select a conversation to start chatting.</p>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* New-group modal (hidden until chat.ts opens it) *@
+    <div id="new-group-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Create a group">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" data-chat-action="close-new-group"></div>
+        <div class="relative w-full max-w-md overflow-hidden rounded-card border border-white/10 bg-surface-1 shadow-elevated">
+            <div class="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                <h2 class="font-display text-lg text-ink">New group</h2>
+                <button type="button" data-chat-action="close-new-group" class="rounded-btn p-1.5 text-ink-muted hover:bg-white/5 hover:text-ink" aria-label="Close">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="h-4 w-4" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" /></svg>
+                </button>
+            </div>
+            <form asp-controller="Chat" asp-action="CreateGroup" method="post" class="p-4">
+                <label for="new-group-title" class="text-xs font-semibold uppercase tracking-wide text-ink-subtle">Group name</label>
+                <input id="new-group-title" name="Title" maxlength="80" required autocomplete="off"
+                       placeholder="e.g. Movie Buddies"
+                       class="mt-1 w-full rounded-btn border border-white/10 bg-surface-2/60 px-3 py-2 text-sm text-ink placeholder:text-ink-subtle focus:border-accent/40 focus:outline-none" />
+
+                <p class="mt-4 text-xs font-semibold uppercase tracking-wide text-ink-subtle">Add friends</p>
+                @if (Model.Friends.Count == 0)
+                {
+                    <p class="mt-2 text-sm text-ink-subtle">Add friends first to create a group.</p>
+                }
+                else
+                {
+                    <div class="mt-2 max-h-56 space-y-1 overflow-y-auto">
+                        @foreach (var friend in Model.Friends)
+                        {
+                            <label class="flex items-center gap-2.5 rounded-btn px-2 py-1.5 hover:bg-white/5">
+                                <input type="checkbox" name="MemberIds" value="@friend.UserId" class="accent-accent" />
+                                <partial name="_Avatar" model="new AvatarViewModel(friend.DisplayName, friend.AvatarFileKey, AvatarSize.Small, Decorative: true)" />
+                                <span class="min-w-0 flex-1 truncate text-sm text-ink">@friend.DisplayName</span>
+                            </label>
+                        }
+                    </div>
+                }
+
+                <div class="mt-5 flex justify-end gap-2">
+                    <button type="button" data-chat-action="close-new-group" class="btn btn-ghost text-sm">Cancel</button>
+                    <button type="submit" class="btn btn-primary text-sm" @(Model.Friends.Count == 0 ? "disabled" : null)>Create group</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>

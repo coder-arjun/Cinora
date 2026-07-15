@@ -1,0 +1,19 @@
+{
+  "name": "cinora-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cinora Playwright E2E flow suite (Phase 6.6, ADR 0021 / design §12) — login, search, review, watchlist, notification. Isolated from the src/Cinora.Web esbuild frontend build and the xUnit test projects.",
+  "type": "module",
+  "scripts": {
+    "install:browser": "playwright install chromium",
+    "test": "playwright test",
+    "test:chromium": "playwright test --project=chromium",
+    "test:serial": "playwright test --project=chromium --workers=1",
+    "report": "playwright show-report",
+    "codegen": "playwright codegen --ignore-https-errors https://localhost:7149"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.0.0"
+  }
+}

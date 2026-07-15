@@ -1,0 +1,76 @@
+@model SearchResultsViewModel
+@{
+    var results = Model.Results;
+    var count = results.TotalResults;
+    var nextPage = results.Page + 1;
+    var summaryCount = count.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
+    // Concise string for the polite #search-status node (site.ts copies it here after the swap). NOT the
+    // whole grid — see Search.cshtml on why #search-results is not itself a live region.
+    var announce = count == 1
+        ? $"1 result for {results.Query}"
+        : $"{summaryCount} results for {results.Query}";
+}
+
+@*
+    Milestone 2.4 / 4.3 — the page-1 results region (partial, NO layout). The Alpine `search` component swaps
+    this into #search-results (innerHTML); it is also server-rendered on the full page / no-JS deep link. A
+    results summary, a mobile-first responsive grid of 2:3 poster cards (_TitleCard, reused verbatim from
+    2.3), and — iff HasMore — a self-replacing HTMX sentinel <li> as the final cell that loads the next page
+    when scrolled into view. All HTMX is attribute-driven (hx-get / hx-trigger="revealed" / hx-swap) — no
+    hx-on, no inline JS — so the strict script-src 'self' CSP is untouched.
+
+    4.3: each card carries a _WatchlistControl positioned over the poster (OUTSIDE the card anchor), driven by
+    the per-page batch status map (Model.Statuses, authed only — ADR 0014). No per-card fetch, no N+1.
+*@
+@* Concise announcement carrier read by site.ts on swap; data attribute only, so it is never itself read
+   aloud during navigation. *@
+<span class="sr-only" data-search-announce="@(results.Items.Count == 0 ? $"No matches for {results.Query}" : announce)"></span>
+@if (results.Items.Count == 0)
+{
+    @* A search miss is a calm empty state, never an error. *@
+    <div class="card-glass mx-auto max-w-md px-6 py-10 text-center">
+        <h2 class="font-display text-xl text-ink">No matches for &ldquo;@results.Query&rdquo;</h2>
+        <p class="mt-2 text-sm text-ink-muted">Try a different title, or check the spelling.</p>
+    </div>
+}
+else
+{
+    <div class="mb-6 flex items-baseline justify-between gap-4">
+        <h2 class="sr-only">Search results</h2>
+        <p class="text-sm text-ink-muted">
+            <span class="font-medium text-ink">@summaryCount</span>
+            @(count == 1 ? "result" : "results") for &ldquo;<span class="text-ink">@results.Query</span>&rdquo;
+        </p>
+    </div>
+
+    <ul role="list" class="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5 md:grid-cols-4 lg:grid-cols-5">
+        @foreach (var card in results.Items)
+        {
+            var status = Model.Statuses.TryGetValue(card.TmdbId, out var s) ? s : (WatchlistStatus?)null;
+            var control = new WatchlistControlVm(card.TmdbId, card.MediaType, status, Model.IsAuthenticated);
+            <li>
+                <div class="relative">
+                    <partial name="_TitleCard" model="card" />
+                    <div class="absolute left-2 top-2 z-10">
+                        <partial name="_WatchlistControl" model="control" />
+                    </div>
+                </div>
+            </li>
+        }
+
+        @if (results.HasMore)
+        {
+            @* Self-replacing sentinel: when revealed it GETs the next page and REPLACES itself (outerHTML)
+               with _SearchResultsPage (next cards + a fresh sentinel, or a terminal marker). Decorative
+               skeleton reserves one card's space so nothing jumps. *@
+            <li hx-get="@Url.Action("SearchResults", "Discovery", new { q = results.Query, media = results.Media, page = nextPage })"
+                hx-trigger="revealed"
+                hx-swap="outerHTML"
+                aria-hidden="true">
+                <div class="skeleton-shimmer aspect-[2/3] rounded-card"></div>
+                <div class="skeleton-shimmer mt-3 h-3.5 w-3/4 rounded-pill"></div>
+                <div class="skeleton-shimmer mt-2 h-3 w-1/3 rounded-pill"></div>
+            </li>
+        }
+    </ul>
+}

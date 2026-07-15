@@ -1,0 +1,41 @@
+@model ActivityFeedVm
+@{
+    var loaded = Model.Items.Count;
+    var moreAnnounce = $"{loaded} more {(loaded == 1 ? "item" : "items")} loaded";
+
+    string? nextUrl = null;
+    if (Model.HasMore && Model.NextCursor is { } cursor)
+    {
+        nextUrl = Url.Action("Feed", "Home", new
+        {
+            cursorCreatedAt = cursor.CreatedAtUtc.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+            cursorId = cursor.Id,
+        });
+    }
+}
+
+@*
+    Milestone 3.4 — the load-more fragment (a cursor request). Returned by the sentinel's hx-get and swapped via
+    outerHTML in place of that sentinel <li>, so these <li> cards append to the #feed-items <ul>. Iff HasMore, a
+    FRESH sentinel <li> re-arms the chain toward the next keyset page; otherwise a quiet terminal <li> ends it
+    (no sentinel → the chain stops). Each sentinel/terminal carries a data-feed-announce string that
+    Scripts/site.ts copies into the polite #feed-status node (mirrors data-search-announce). Attribute-only HTMX
+    — no hx-on, no inline JS — so the strict CSP is untouched.
+*@
+@foreach (var item in Model.Items)
+{
+    <li><partial name="_FeedItem" model="item" /></li>
+}
+
+@if (nextUrl is not null)
+{
+    <li hx-get="@nextUrl" hx-trigger="revealed" hx-swap="outerHTML" aria-hidden="true" data-feed-announce="@moreAnnounce">
+        <div class="skeleton-shimmer h-36 rounded-card"></div>
+    </li>
+}
+else if (loaded > 0)
+{
+    <li class="py-4 text-center text-sm text-ink-subtle" data-feed-announce="You're all caught up">
+        You&rsquo;re all caught up.
+    </li>
+}

@@ -1,0 +1,18 @@
+@model SearchPromptViewModel
+
+@*
+    Milestone 2.4 — the calm idle/empty state shown before a query is entered (or when the term is shorter
+    than the UX threshold). Always served with HTTP 200 so HTMX swaps it without spinning — an empty search
+    box is the idle state, not an error. Purely presentational; carries no TMDB data.
+*@
+<div class="card-glass mx-auto flex max-w-md flex-col items-center px-6 py-12 text-center">
+    <span class="flex h-14 w-14 items-center justify-center rounded-pill border border-white/10 bg-surface-2/60 text-accent" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="currentColor" class="h-7 w-7">
+            <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+        </svg>
+    </span>
+    <h2 class="mt-5 font-display text-2xl text-ink">Search for a movie</h2>
+    <p class="mt-2 text-sm text-ink-muted">
+        Start typing a title to find and rate any film.
+    </p>
+</div>

@@ -1,0 +1,114 @@
+@model NotificationVm
+@{
+    var now = DateTime.UtcNow;
+    var delta = now - Model.CreatedAtUtc;
+    string relative =
+        delta.TotalMinutes < 1 ? "just now"
+        : delta.TotalMinutes < 60 ? $"{(int)delta.TotalMinutes}m ago"
+        : delta.TotalHours < 24 ? $"{(int)delta.TotalHours}h ago"
+        : delta.TotalDays < 7 ? $"{(int)delta.TotalDays}d ago"
+        : Model.CreatedAtUtc.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture);
+
+    // Deep-link target by notification type — resolved through the single shared NotificationDeepLink grammar
+    // (ADR 0020 §5) so this inbox card's href and the Web Push payload's data.url always agree. Review events
+    // (ReviewLiked/CommentAdded) link to the reviewed title's Details page (coords resolved in the projection);
+    // friend events link to the friends page or the new friend's profile. Null when unresolved (no link).
+    string? href = NotificationDeepLink.Resolve(
+        Model.Type, Model.ReviewTargetTmdbId, Model.ReviewTargetMedia, Model.ActorUserId);
+
+    // A distinct on-brand icon per type (colour is not the sole signal — the message text names the event).
+    (string path, string label) icon = Model.Type switch
+    {
+        NotificationType.ReviewLiked => (
+            "M9.653 16.915l-.005-.003-.019-.01a20.759 20.759 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002a.739.739 0 01-.69.001l-.002-.001z",
+            "Like"),
+        NotificationType.CommentAdded => (
+            "M10 3c-4.31 0-8 3.033-8 7 0 2.024.978 3.825 2.499 5.085a3.478 3.478 0 01-.522 1.756.75.75 0 00.584 1.143 5.976 5.976 0 003.936-1.108c.487.082.99.124 1.503.124 4.31 0 8-3.033 8-7s-3.69-7-8-7z",
+            "Comment"),
+        _ => (
+            "M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z",
+            "Friend"),
+    };
+}
+
+@*
+    Milestone 3.5 — one inbox notification. XSS stance (§3): @Model.Message and @Model.ActorDisplayName store the
+    actor's RAW display name and are ALWAYS Razor output-encoded (never Html.Raw). Unread rows carry an accent
+    marker + a mark-read affordance (a real anti-forgery form → works no-JS; HTMX can enhance). Attribute-only —
+    no inline JS, no hx-on — so the strict CSP is untouched.
+*@
+<li data-notification-item
+    data-notification-read="@Model.IsRead.ToString().ToLowerInvariant()"
+    class="card-glass flex items-start gap-3 p-4 sm:p-5 @(Model.IsRead ? null : "ring-1 ring-accent/30")">
+    @* Milestone 4.2 Step B — the actor's real avatar (or the monogram fallback) via the shared _Avatar seam, with
+       the event-type icon riding as a small corner badge so both the "who" and the "what" stay legible. A system
+       notification with no actor degrades to the type icon alone. *@
+    @if (Model.ActorDisplayName is { Length: > 0 } actorName)
+    {
+        <span class="relative mt-0.5 shrink-0">
+            @* Decorative: the notification message text below already names the actor (no double SR announcement). *@
+            <partial name="_Avatar" model="new AvatarViewModel(actorName, Model.ActorAvatarFileKey, AvatarSize.Small, Decorative: true)" />
+            <span class="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-pill border border-white/10 bg-surface-2 text-ink"
+                  role="img" aria-label="@icon.label">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 @(Model.Type == NotificationType.ReviewLiked ? "text-accent" : "text-ink-muted")" aria-hidden="true">
+                    <path fill-rule="evenodd" d="@icon.path" clip-rule="evenodd" />
+                </svg>
+            </span>
+        </span>
+    }
+    else
+    {
+        <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-pill border border-white/10 bg-surface-2/70 text-ink"
+              role="img" aria-label="@icon.label">
+            <svg viewBox="0 0 20 20" fill="currentColor" class="h-4.5 w-4.5 @(Model.Type == NotificationType.ReviewLiked ? "text-accent" : "text-ink-muted")" aria-hidden="true">
+                <path fill-rule="evenodd" d="@icon.path" clip-rule="evenodd" />
+            </svg>
+        </span>
+    }
+
+    <div class="min-w-0 flex-1">
+        <p class="text-sm leading-snug text-ink">
+            @if (!Model.IsRead)
+            {
+                <span class="mr-1 inline-block h-2 w-2 rounded-pill bg-accent align-middle" aria-hidden="true"></span>
+                <span class="sr-only">Unread. </span>
+            }
+            @if (href is not null)
+            {
+                <a href="@href" class="font-medium text-ink transition-colors hover:text-accent hover:underline focus-visible:underline">@Model.Message</a>
+            }
+            else
+            {
+                <span class="font-medium text-ink">@Model.Message</span>
+            }
+        </p>
+        <p class="mt-1 text-xs text-ink-subtle">
+            <time datetime="@Model.CreatedAtUtc.ToString("o", System.Globalization.CultureInfo.InvariantCulture)"
+                  title="@Model.CreatedAtUtc.ToString("MMM d, yyyy HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture)">@relative</time>
+            @if (Model.Type is NotificationType.ReviewLiked or NotificationType.CommentAdded
+                && Model.ReviewTargetTitle is { Length: > 0 })
+            {
+                <span class="text-ink-subtle"> · @Model.ReviewTargetTitle</span>
+            }
+        </p>
+    </div>
+
+    @if (!Model.IsRead)
+    {
+        <form asp-controller="Notifications" asp-action="Read" asp-route-id="@Model.Id" method="post" class="shrink-0">
+            <button type="submit" class="btn btn-ghost px-3 py-1.5 text-xs" aria-label="Mark this notification as read">
+                Mark read
+            </button>
+        </form>
+    }
+    else
+    {
+        <span aria-hidden="true"
+              class="mt-1 inline-flex shrink-0 items-center gap-1 text-xs text-ink-subtle">
+            <svg viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
+                <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            Read
+        </span>
+    }
+</li>

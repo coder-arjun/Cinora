@@ -1,0 +1,46 @@
+@model RecommendationSet
+@{
+    var isAi = Model.Source == RecommendationSource.Ai;
+    // Honest labelling by source (design §11): a real grounded set is "For You"; the deterministic fallback is a
+    // subtle, truthful "Popular picks" (never an error).
+    var eyebrow = isAi ? "Recommended" : "Trending now";
+    var heading = isAi ? "For You" : "Popular picks";
+}
+
+@*
+    Milestone 5.4 — the personalized "For You" rail for the /home feed, lazy-loaded via HTMX
+    (hx-get="/recommendations/rail", hx-trigger="load") and swapped in place of the shell skeleton
+    (hx-swap="outerHTML"). This partial's root REPLACES that skeleton container, so it carries aria-busy="false"
+    to clear the shell's loading state (WCAG 4.1.2). The heading lives HERE (not the shell) because its text
+    depends on the served Source, which is only known after the LLM-free serve. The feed never blocks on this rail.
+    Styling reuses the discovery snap-scroll rail grammar (.rail / .rail-scroller in app.css); each item is a
+    _RecommendationCard whose dismiss control targets its own <li>.
+*@
+@if (Model.Picks.Count == 0)
+{
+    @* No picks yet → clear the busy state silently (a bonus rail, never an error). This root carries NO top
+       margin (the mt-10 now lives on the /home swap TARGET this replaces), so an empty result collapses the
+       whole band cleanly — no dead whitespace above the friends feed (CLS/empty fix). display:none also drops
+       any margin, so the feed follows the header with only its own spacing. *@
+    <div data-rec-region aria-busy="false" class="hidden"></div>
+}
+else
+{
+    @* Populated: this root REPLACES the /home swap target, so it re-declares the band's top margin (mt-10) that
+       the target carried, keeping the spacing identical when the cards swap in (no shift). *@
+    <div data-rec-region aria-busy="false" aria-labelledby="foryou-rail-heading" class="mt-10 sm:mt-12">
+        <p class="text-xs font-semibold uppercase tracking-widest text-accent">@eyebrow</p>
+        <h2 id="foryou-rail-heading" class="mt-1 font-display text-2xl text-ink sm:text-3xl">@heading</h2>
+
+        <div class="rail mt-1">
+            <ul role="list" class="rail-scroller">
+                @foreach (var pick in Model.Picks)
+                {
+                    <li data-rec-item class="rail-item w-32 sm:w-40 lg:w-44">
+                        <partial name="_RecommendationCard" model="pick" />
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+}
