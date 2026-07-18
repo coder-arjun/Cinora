@@ -59,6 +59,10 @@ internal sealed class StubTmdbClient : ITmdbClient
         throw new NotSupportedException();
 
     /// <inheritdoc />
+    public Task<TmdbPage<TmdbTitleSummary>> SearchMultiAsync(string query, int page, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
+    /// <inheritdoc />
     public Task<IReadOnlyList<TmdbTitleSummary>> GetRecommendationsAsync(MediaType media, int tmdbId, CancellationToken cancellationToken) =>
         Recommendations is null
             ? throw new NotSupportedException()
@@ -73,5 +77,9 @@ internal sealed class StubTmdbClient : ITmdbClient
 
     /// <inheritdoc />
     public Task<IReadOnlyList<TmdbTitleSummary>> GetRegionalRailAsync(MediaType media, RailKind kind, string originalLanguage, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
+    /// <inheritdoc />
+    public Task<TmdbPersonCredits?> GetPersonCreditsAsync(int personId, CancellationToken cancellationToken) =>
         throw new NotSupportedException();
 }

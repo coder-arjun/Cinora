@@ -61,6 +61,9 @@ public sealed class CinoraDbContext
     /// <summary>The likes recorded against reviews.</summary>
     public DbSet<ReviewLike> ReviewLikes => Set<ReviewLike>();
 
+    /// <summary>The title-level "loves" (the poster love button).</summary>
+    public DbSet<MovieLike> MovieLikes => Set<MovieLike>();
+
     /// <summary>The comments recorded against reviews.</summary>
     public DbSet<Comment> Comments => Set<Comment>();
 

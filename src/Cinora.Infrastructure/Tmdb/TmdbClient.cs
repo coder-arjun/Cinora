@@ -70,6 +70,17 @@ internal sealed class TmdbClient : ITmdbClient
     }
 
     /// <inheritdoc />
+    public async Task<TmdbPage<TmdbTitleSummary>> SearchMultiAsync(string query, int page, CancellationToken cancellationToken)
+    {
+        var encodedQuery = Uri.EscapeDataString(query);
+        var envelope = await _http.GetFromJsonAsync<TmdbPagedDto<TmdbListItemDto>>(
+            $"search/multi?query={encodedQuery}&page={page}&include_adult=false&language={Language}",
+            cancellationToken);
+
+        return TmdbMapper.ToMultiPage(envelope);
+    }
+
+    /// <inheritdoc />
     public async Task<TmdbTitleDetails?> GetDetailsAsync(MediaType media, int tmdbId, CancellationToken cancellationToken)
     {
         // Details uses GetAsync (not GetFromJsonAsync) so a 404 for an unknown title maps to null rather
@@ -158,6 +169,26 @@ internal sealed class TmdbClient : ITmdbClient
 
         var page = await _http.GetFromJsonAsync<TmdbPagedDto<TmdbListItemDto>>(query, cancellationToken);
         return TmdbMapper.ToSummaries(page, media);
+    }
+
+    /// <inheritdoc />
+    public async Task<TmdbPersonCredits?> GetPersonCreditsAsync(int personId, CancellationToken cancellationToken)
+    {
+        // Like GetDetailsAsync, uses GetAsync so an unknown person (404) maps to null rather than throwing —
+        // the caching decorator must not cache that null.
+        using var response = await _http.GetAsync(
+            $"person/{personId}?append_to_response=combined_credits&language={Language}",
+            cancellationToken);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+
+        var dto = await response.Content.ReadFromJsonAsync<TmdbPersonDto>(cancellationToken);
+        return TmdbMapper.ToPersonCredits(dto);
     }
 
     // TMDB uses "movie" and "tv" path segments; the Domain enum distinguishes Movie from Series.

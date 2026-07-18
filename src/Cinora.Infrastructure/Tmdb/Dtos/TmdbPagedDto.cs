@@ -33,6 +33,11 @@ internal sealed record TmdbListItemDto
     [JsonPropertyName("id")]
     public int Id { get; init; }
 
+    // Present ONLY on the multi-search endpoint (search/multi), where each result carries its own kind
+    // ("movie"/"tv"/"person"). Null on the single-media list/search endpoints (their media is fixed by the URL).
+    [JsonPropertyName("media_type")]
+    public string? MediaType { get; init; }
+
     [JsonPropertyName("title")]
     public string? Title { get; init; }
 

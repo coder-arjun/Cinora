@@ -42,6 +42,7 @@ internal sealed class CachedTmdbClient : ITmdbClient
     private const double RecommendationsTtlFactor = 144;  // 12 h: a title's "more like this" set changes slowly (§5.3).
     private const double DiscoverTtlFactor = 72;   // 6 h: genre-popularity discovery drifts a little faster (§5.3).
     private const double RegionalTtlFactor = 72;   // 6 h: original-language discover rails drift like genre-discover.
+    private const double PersonTtlFactor = 288;    // 24 h: a person's filmography changes rarely (like details).
 
     // ±10% jitter, drawn per write, so hot keys created together do not expire together (ADR 0007 stampede
     // guard). Varying by write (not a single fixed value) is the point.
@@ -117,6 +118,17 @@ internal sealed class CachedTmdbClient : ITmdbClient
             cancellationToken);
 
     /// <inheritdoc />
+    public Task<TmdbPage<TmdbTitleSummary>> SearchMultiAsync(string query, int page, CancellationToken cancellationToken) =>
+        GetOrSetAsync(
+            // Shares the search-key namespace (redacted in logs) with a distinct "multi" media token so it never
+            // collides with the single-media search keys.
+            $"{SearchKeyPrefix}multi:{Normalize(query)}:{page}",
+            SearchTtlFactor,
+            ct => _inner.SearchMultiAsync(query, page, ct),
+            static result => result is { Items.Count: > 0 },
+            cancellationToken);
+
+    /// <inheritdoc />
     public Task<TmdbTitleDetails?> GetDetailsAsync(MediaType media, int tmdbId, CancellationToken cancellationToken) =>
         GetOrSetAsync<TmdbTitleDetails?>(
             $"cinora:tmdb:details:{Segment(media)}:{tmdbId}",
@@ -165,6 +177,16 @@ internal sealed class CachedTmdbClient : ITmdbClient
             RegionalTtlFactor,
             ct => _inner.GetRegionalRailAsync(media, kind, originalLanguage, ct),
             HasItems,
+            cancellationToken);
+
+    /// <inheritdoc />
+    public Task<TmdbPersonCredits?> GetPersonCreditsAsync(int personId, CancellationToken cancellationToken) =>
+        GetOrSetAsync<TmdbPersonCredits?>(
+            $"cinora:tmdb:person:{personId}",
+            PersonTtlFactor,
+            ct => _inner.GetPersonCreditsAsync(personId, ct),
+            // A 404 maps to null and must not be cached, so a later add to TMDB is seen (ADR 0007).
+            static person => person is not null,
             cancellationToken);
 
     // Cache-aside core: try the cache, call the source on a miss, then store only cacheable (non-null,

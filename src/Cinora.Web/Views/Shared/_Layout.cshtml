@@ -69,7 +69,14 @@
     <link rel="stylesheet" href="@Assets.Resolve("app.css")" />
     @await RenderSectionAsync("Head", required: false)
 </head>
-<body class="flex min-h-dvh flex-col">
+<body class="flex min-h-dvh flex-col@(ViewData["Aurora"] as bool? == true ? " has-aurora" : "")">
+    @* Premium animated aurora backdrop — opt-in per page via ViewData["Aurora"] (auth/forms/heroes). Fixed
+       behind all content (z-index:-1); the body bg goes transparent so it shows over the html surface-0 base. *@
+    @if (ViewData["Aurora"] as bool? == true)
+    {
+        <partial name="_AuroraBackground" />
+    }
+
     <a href="#main-content"
        class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-btn focus:bg-accent focus:px-4 focus:py-2 focus:font-semibold focus:text-on-accent">
         Skip to main content

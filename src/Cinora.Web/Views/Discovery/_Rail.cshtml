@@ -25,11 +25,16 @@ else
             {
                 var status = Model.Statuses.TryGetValue(card.TmdbId, out var s) ? s : (WatchlistStatus?)null;
                 var control = new WatchlistControlVm(card.TmdbId, card.MediaType, status, Model.IsAuthenticated);
+                var likeState = Model.Likes.TryGetValue(card.TmdbId, out var lk) ? lk : null;
+                var love = new LoveButtonVm(card.TmdbId, card.MediaType, likeState?.Liked ?? false, likeState?.Count ?? 0, Model.IsAuthenticated);
                 <li class="rail-item w-32 sm:w-40 lg:w-44">
                     <div class="relative">
                         <partial name="_TitleCard" model="card" />
                         <div class="absolute left-2 top-2 z-10">
                             <partial name="_WatchlistControl" model="control" />
+                        </div>
+                        <div class="absolute right-2 top-2 z-10">
+                            <partial name="_LoveButton" model="love" />
                         </div>
                     </div>
                 </li>

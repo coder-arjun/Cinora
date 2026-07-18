@@ -2,72 +2,133 @@
 @{
     ViewData["Title"] = "Sign in";
     ViewData["MinimalNav"] = true;
+    ViewData["Aurora"] = true;
 }
 
-<section class="mx-auto flex w-full max-w-md flex-col px-4 py-16 sm:py-24">
-    <div class="card-glass animate-rise-in p-6 sm:p-8">
-        <h1 class="font-display text-3xl text-ink">Welcome back</h1>
-        <p class="mt-2 text-sm text-ink-muted">Sign in to continue to Cinora.</p>
+@*
+    Feature #11 — a cinematic split sign-in screen: a themed hero (Cinora's vision: a premium social home for
+    movie & series reviews) on the left, the sign-in card on the right. The form, validation, external schemes
+    and password toggle are UNCHANGED — only relocated into the right column. Decorative motion (drifting gold
+    orbs, headline shimmer, staggered reveals) is all transform/opacity and collapses under prefers-reduced-motion.
+*@
+<section class="relative isolate mx-auto grid w-full max-w-6xl gap-10 px-4 py-12 lg:grid-cols-[1.05fr_minmax(0,26rem)] lg:items-center lg:gap-16 lg:py-20">
+    @* The animated aurora backdrop is rendered app-wide by _Layout (ViewData["Aurora"]) behind all content. *@
 
-        <form asp-controller="Account" asp-action="Login" method="post" class="mt-8 space-y-5">
-            <div asp-validation-summary="ModelOnly" role="alert"></div>
-            <input type="hidden" asp-for="ReturnUrl" />
+    @* --- Hero (left) --- *@
+    <div class="relative order-1" data-reveal-group>
+        <p class="inline-flex items-center gap-2 rounded-pill border border-white/10 bg-surface-1/60 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-accent backdrop-blur-glass">
+            <svg viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
+                <path d="M10 1.5l2.47 5.01 5.53.8-4 3.9.94 5.49L10 14.1l-4.95 2.6.94-5.49-4-3.9 5.53-.8z" />
+            </svg>
+            Premium film &amp; series community
+        </p>
 
-            <div>
-                <label asp-for="EmailOrUserName" class="label"></label>
-                <input asp-for="EmailOrUserName" type="text" autocomplete="username" class="input"
-                       placeholder="you@example.com or your display name"
-                       aria-describedby="EmailOrUserName-error"
-                       aria-invalid="@(ViewData.ModelState[nameof(Model.EmailOrUserName)]?.Errors.Count > 0 ? "true" : "false")" />
-                <span asp-validation-for="EmailOrUserName" id="EmailOrUserName-error"></span>
-            </div>
+        <h1 class="mt-6 font-display text-4xl font-semibold leading-[1.05] text-ink sm:text-5xl lg:text-6xl">
+            Every film worth<br class="hidden sm:block" />
+            <span class="hero-shimmer">talking about.</span>
+        </h1>
 
-            <div>
-                <label asp-for="Password" class="label"></label>
-                <div class="relative" x-data="passwordToggle">
-                    <input asp-for="Password" autocomplete="current-password" class="input pr-11"
-                           x-bind:type="inputType"
-                           aria-describedby="Password-error"
-                           aria-invalid="@(ViewData.ModelState[nameof(Model.Password)]?.Errors.Count > 0 ? "true" : "false")" />
-                    <partial name="_PasswordEyeButton" />
-                </div>
-                <span asp-validation-for="Password" id="Password-error"></span>
-            </div>
+        <p class="mt-6 max-w-xl text-lg text-ink-muted">
+            Rate movies &amp; series out of 10, write reviews people actually read, build your watchlist,
+            follow friends' takes, and get AI-tuned picks — all in one cinematic home.
+        </p>
 
-            <div class="flex items-center justify-between gap-3">
-                <label class="flex min-h-6 items-center gap-2 py-1 text-sm text-ink-muted">
-                    <input asp-for="RememberMe" class="size-4 rounded accent-accent" />
-                    Remember me
-                </label>
-                <a asp-controller="Account" asp-action="ForgotPassword" class="link text-sm">Forgot password?</a>
-            </div>
+        @* Feature chips — small dynamic icons reinforcing what Cinora is. *@
+        <ul role="list" class="mt-8 flex flex-wrap gap-2.5">
+            <li class="inline-flex items-center gap-2 rounded-pill border border-white/10 bg-surface-1/50 px-3 py-1.5 text-sm text-ink-muted">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4 text-accent" aria-hidden="true"><path d="M10 1.5l2.47 5.01 5.53.8-4 3.9.94 5.49L10 14.1l-4.95 2.6.94-5.49-4-3.9 5.53-.8z" /></svg>
+                Reviews out of 10
+            </li>
+            <li class="inline-flex items-center gap-2 rounded-pill border border-white/10 bg-surface-1/50 px-3 py-1.5 text-sm text-ink-muted">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" class="h-4 w-4 text-accent" aria-hidden="true"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" /></svg>
+                Watchlists
+            </li>
+            <li class="inline-flex items-center gap-2 rounded-pill border border-white/10 bg-surface-1/50 px-3 py-1.5 text-sm text-ink-muted">
+                <svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4 text-accent" aria-hidden="true"><path d="M12 2l1.6 4.4L18 8l-4.4 1.6L12 14l-1.6-4.4L6 8l4.4-1.6zM18 13l.9 2.5L21.5 16l-2.6.5L18 19l-.9-2.5L14.5 16l2.6-.5z" /></svg>
+                AI picks
+            </li>
+            <li class="inline-flex items-center gap-2 rounded-pill border border-white/10 bg-surface-1/50 px-3 py-1.5 text-sm text-ink-muted">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 text-accent" aria-hidden="true"><circle cx="9" cy="8" r="3.2" /><path d="M3.5 20a5.5 5.5 0 0 1 11 0" /><path d="M16 5.4a3 3 0 0 1 0 5.9" /><path d="M17.6 20a5.5 5.5 0 0 0-3-4.9" /></svg>
+                Friends' feed
+            </li>
+        </ul>
 
-            <button type="submit" class="btn btn-primary w-full">Sign in</button>
-        </form>
-
-        @if (Model.ExternalSchemes.Count > 0)
-        {
-            <section aria-label="External sign-in" class="mt-8">
-                <div class="mb-4 flex items-center gap-3 text-xs uppercase tracking-widest text-ink-subtle">
-                    <span class="h-px flex-1 bg-white/10"></span>
-                    Or sign in with
-                    <span class="h-px flex-1 bg-white/10"></span>
-                </div>
-                <div class="flex flex-col gap-2">
-                    @foreach (var scheme in Model.ExternalSchemes)
-                    {
-                        <form asp-controller="Account" asp-action="ExternalLogin" method="post">
-                            <input type="hidden" name="provider" value="@scheme.Name" />
-                            <input type="hidden" asp-for="ReturnUrl" />
-                            <button type="submit" class="btn btn-ghost w-full">@(scheme.DisplayName ?? scheme.Name)</button>
-                        </form>
-                    }
-                </div>
-            </section>
-        }
+        @* Film-strip motif — a subtly pulsing row of frames, purely decorative. Per-cell stagger comes from
+           :nth-child animation-delays in app.css (CSP forbids inline style attributes). *@
+        <div class="hero-strip mt-10 hidden items-center gap-1.5 lg:flex" aria-hidden="true">
+            @for (var i = 0; i < 9; i++)
+            {
+                <span class="hero-strip-cell h-9 w-6 rounded-[3px] border border-white/10 bg-gradient-to-b from-surface-2 to-surface-1"></span>
+            }
+        </div>
     </div>
 
-    <p class="mt-6 text-center text-sm text-ink-muted">
-        New to Cinora? <a asp-controller="Account" asp-action="Register" class="link">Create an account</a>
-    </p>
+    @* --- Sign-in card (right) — form UNCHANGED, only relocated --- *@
+    <div class="relative order-2 w-full max-w-md lg:justify-self-end" data-reveal>
+        <div class="card-glass p-6 sm:p-8" data-spotlight>
+            <h2 class="font-display text-3xl text-ink">Welcome back</h2>
+            <p class="mt-2 text-sm text-ink-muted">Sign in to continue to Cinora.</p>
+
+            <form asp-controller="Account" asp-action="Login" method="post" class="mt-8 space-y-5">
+                <div asp-validation-summary="ModelOnly" role="alert"></div>
+                <input type="hidden" asp-for="ReturnUrl" />
+
+                <div>
+                    <label asp-for="EmailOrUserName" class="label"></label>
+                    <input asp-for="EmailOrUserName" type="text" autocomplete="username" class="input"
+                           placeholder="you@example.com or your display name"
+                           aria-describedby="EmailOrUserName-error"
+                           aria-invalid="@(ViewData.ModelState[nameof(Model.EmailOrUserName)]?.Errors.Count > 0 ? "true" : "false")" />
+                    <span asp-validation-for="EmailOrUserName" id="EmailOrUserName-error"></span>
+                </div>
+
+                <div>
+                    <label asp-for="Password" class="label"></label>
+                    <div class="relative" x-data="passwordToggle">
+                        <input asp-for="Password" autocomplete="current-password" class="input pr-11"
+                               x-bind:type="inputType"
+                               aria-describedby="Password-error"
+                               aria-invalid="@(ViewData.ModelState[nameof(Model.Password)]?.Errors.Count > 0 ? "true" : "false")" />
+                        <partial name="_PasswordEyeButton" />
+                    </div>
+                    <span asp-validation-for="Password" id="Password-error"></span>
+                </div>
+
+                <div class="flex items-center justify-between gap-3">
+                    <label class="flex min-h-6 items-center gap-2 py-1 text-sm text-ink-muted">
+                        <input asp-for="RememberMe" class="size-4 rounded accent-accent" />
+                        Remember me
+                    </label>
+                    <a asp-controller="Account" asp-action="ForgotPassword" class="link text-sm">Forgot password?</a>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-full">Sign in</button>
+            </form>
+
+            @if (Model.ExternalSchemes.Count > 0)
+            {
+                <section aria-label="External sign-in" class="mt-8">
+                    <div class="mb-4 flex items-center gap-3 text-xs uppercase tracking-widest text-ink-subtle">
+                        <span class="h-px flex-1 bg-white/10"></span>
+                        Or sign in with
+                        <span class="h-px flex-1 bg-white/10"></span>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        @foreach (var scheme in Model.ExternalSchemes)
+                        {
+                            <form asp-controller="Account" asp-action="ExternalLogin" method="post">
+                                <input type="hidden" name="provider" value="@scheme.Name" />
+                                <input type="hidden" asp-for="ReturnUrl" />
+                                <button type="submit" class="btn btn-ghost w-full">@(scheme.DisplayName ?? scheme.Name)</button>
+                            </form>
+                        }
+                    </div>
+                </section>
+            }
+        </div>
+
+        <p class="mt-6 text-center text-sm text-ink-muted">
+            New to Cinora? <a asp-controller="Account" asp-action="Register" class="link">Create an account</a>
+        </p>
+    </div>
 </section>

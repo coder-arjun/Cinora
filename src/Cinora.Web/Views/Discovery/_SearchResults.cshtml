@@ -46,13 +46,18 @@ else
     <ul role="list" class="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5 md:grid-cols-4 lg:grid-cols-5">
         @foreach (var card in results.Items)
         {
-            var status = Model.Statuses.TryGetValue(card.TmdbId, out var s) ? s : (WatchlistStatus?)null;
+            var status = Model.Statuses.TryGetValue((card.TmdbId, card.MediaType), out var s) ? s : (WatchlistStatus?)null;
             var control = new WatchlistControlVm(card.TmdbId, card.MediaType, status, Model.IsAuthenticated);
+            var likeState = Model.Likes.TryGetValue((card.TmdbId, card.MediaType), out var lk) ? lk : null;
+            var love = new LoveButtonVm(card.TmdbId, card.MediaType, likeState?.Liked ?? false, likeState?.Count ?? 0, Model.IsAuthenticated);
             <li>
                 <div class="relative">
                     <partial name="_TitleCard" model="card" />
                     <div class="absolute left-2 top-2 z-10">
                         <partial name="_WatchlistControl" model="control" />
+                    </div>
+                    <div class="absolute right-2 top-2 z-10">
+                        <partial name="_LoveButton" model="love" />
                     </div>
                 </div>
             </li>

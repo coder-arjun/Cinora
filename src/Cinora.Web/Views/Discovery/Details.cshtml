@@ -140,12 +140,17 @@
                        controller resolves the current user's status (authed) after first-touch persistence and
                        passes the control model via ViewData; anonymous viewers get the sign-in affordance. The
                        control swaps itself via HTMX on set/remove — instant feedback under the strict CSP. *@
-                    @if (ViewData["WatchlistControl"] is WatchlistControlVm watchlistControl)
-                    {
-                        <div class="mt-7">
+                    <div class="mt-7 flex flex-wrap items-center gap-3">
+                        @if (ViewData["WatchlistControl"] is WatchlistControlVm watchlistControl)
+                        {
                             <partial name="_WatchlistControl" model="watchlistControl" />
-                        </div>
-                    }
+                        }
+                        @* Title love button (§ movie likes) — the big Details variant with the total love count. *@
+                        @if (ViewData["LoveButton"] is LoveButtonVm loveButton)
+                        {
+                            <partial name="_LoveButton" model="loveButton" />
+                        }
+                    </div>
 
                     @* Movie sharing (§3) — send this title to a friend or group via chat. Authenticated only;
                        a plain link to the /chat/share picker (no inline JS — the Details page stays CSP-clean). *@
@@ -182,28 +187,29 @@
         {
             <section aria-labelledby="cast-heading">
                 <h2 id="cast-heading" class="font-display text-2xl text-ink">Top billed cast</h2>
-                @* The cast items are intentionally non-linked (no person pages in Phase 2), so the scroller
-                   would otherwise have ZERO focusable descendants — off-screen cast unreachable by keyboard
-                   (WCAG 2.1.1, Level A). Make the overflow container itself focusable (tabindex="0") with an
-                   accessible name; a focused scroll region pans with the arrow/Page keys and the global
-                   :focus-visible ring is the indicator. Scoped to CAST ONLY — the Home/Search _Rail scrollers
-                   keep no tabindex because their cards are links (adding it there would double the focus stops). *@
+                @* Feature #9 — each cast member links to their person page (/discover/person/{id}) showing their
+                   best-rated titles. Because the cards are now links, the scroller has focusable descendants, so
+                   it no longer needs the tabindex="0" focus workaround (which would double the focus stops) —
+                   this now matches the Home/Search _Rail scrollers. *@
                 <div class="rail mt-5">
-                    <ul role="list" tabindex="0" aria-label="Top billed cast (scrollable)" class="rail-scroller">
+                    <ul role="list" class="rail-scroller">
                         @foreach (var member in Model.Cast)
                         {
                             <li class="rail-item w-28 sm:w-32">
-                                @* alt="" — the actor's name is the adjacent text label, so the photo is
-                                   presentational (avoids the SR reading the name twice). *@
-                                <div class="poster-frame aspect-[2/3]">
-                                    <img asp-tmdb-poster="@member.ProfilePath" asp-tmdb-size="W185" alt=""
-                                         class="poster-img" />
-                                </div>
-                                <p class="mt-2 truncate text-sm font-medium text-ink" title="@member.Name">@member.Name</p>
-                                @if (member.Character is not null)
-                                {
-                                    <p class="truncate text-xs text-ink-subtle" title="@member.Character">@member.Character</p>
-                                }
+                                <a href="/discover/person/@member.TmdbId" class="group block rounded-card focus-visible:outline-none"
+                                   aria-label="@member.Name — view titles">
+                                    @* alt="" — the actor's name is the adjacent text label, so the photo is
+                                       presentational (avoids the SR reading the name twice). *@
+                                    <div class="poster-frame aspect-[2/3] transition duration-300 group-hover:ring-2 group-hover:ring-accent/60 group-focus-visible:ring-2 group-focus-visible:ring-accent">
+                                        <img asp-tmdb-poster="@member.ProfilePath" asp-tmdb-size="W185" alt=""
+                                             class="poster-img transition duration-500 group-hover:scale-105" />
+                                    </div>
+                                    <p class="mt-2 truncate text-sm font-medium text-ink transition-colors group-hover:text-accent" title="@member.Name">@member.Name</p>
+                                    @if (member.Character is not null)
+                                    {
+                                        <p class="truncate text-xs text-ink-subtle" title="@member.Character">@member.Character</p>
+                                    }
+                                </a>
                             </li>
                         }
                     </ul>

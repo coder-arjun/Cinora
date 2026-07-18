@@ -1,4 +1,5 @@
 using Cinora.Application.Features.Discovery;
+using Cinora.Application.Features.MovieLikes;
 using Cinora.Domain.Enums;
 
 namespace Cinora.Web.ViewModels.Discovery;
@@ -14,12 +15,15 @@ namespace Cinora.Web.ViewModels.Discovery;
 /// <param name="Query">The trimmed query echoed into the input (empty when none was supplied).</param>
 /// <param name="Media">The media type to search (defaults to Movie; drives the region's <c>data-media</c>).</param>
 /// <param name="Results">The server-rendered page-1 results, or <c>null</c> to show the idle prompt.</param>
-/// <param name="Statuses">The current user's watchlist statuses for the inline page-1 titles (§5.3); empty for
-/// anonymous viewers or when there are no results.</param>
+/// <param name="Statuses">The current user's watchlist statuses for the inline page-1 titles, keyed by
+/// (TMDB id, media) since unified search mixes movies + series; empty for anonymous or no results.</param>
+/// <param name="Likes">The love state (count + whether-I-loved) for the inline page-1 titles, keyed by
+/// (TMDB id, media); empty for anonymous.</param>
 /// <param name="IsAuthenticated">Whether the viewer is signed in (drives the cards' watchlist control).</param>
 public sealed record SearchPageViewModel(
     string Query,
     MediaType Media,
     SearchResultsVm? Results,
-    IReadOnlyDictionary<int, WatchlistStatus> Statuses,
+    IReadOnlyDictionary<(int TmdbId, MediaType Media), WatchlistStatus> Statuses,
+    IReadOnlyDictionary<(int TmdbId, MediaType Media), MovieLikeVm> Likes,
     bool IsAuthenticated);

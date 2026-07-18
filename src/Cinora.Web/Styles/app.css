@@ -160,8 +160,10 @@
       background-color 150ms var(--ease-standard), border-color 150ms var(--ease-standard),
       opacity 150ms var(--ease-standard);
   }
+  /* Tactile press micro-interaction (ui-ux-pro-max: "scale press 0.97 → 1.0"): a subtle scale-in reads more
+     premium/haptic than a 1px nudge. transform-only, so the global reduced-motion rule makes it instant-safe. */
   .btn:active {
-    transform: translateY(1px);
+    transform: scale(0.97);
   }
   /* Busy/disabled affordance — pairs with the async push-subscribe "Enabling…" state (site.ts). Static
      opacity + cursor only (no animation), so it is inert under prefers-reduced-motion. */
@@ -990,4 +992,332 @@
   .poster-card:hover .poster-img {
     transform: none;
   }
+}
+
+/* --- Title love button (movie likes) --------------------------------------------------------------------
+   A glass heart pill over the poster (and a larger variant on Details). The heart fills rose when loved and
+   plays a one-shot pop on insertion (HTMX swaps in a new element on toggle). The global reduced-motion rule
+   above collapses the pop to instant, so it stays reduced-motion safe without a separate guard. */
+.love-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  padding: 0.25rem 0.5rem;
+  background: rgba(9, 11, 15, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e7e9ee;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.love-btn:hover {
+  transform: scale(1.06);
+  background: rgba(9, 11, 15, 0.78);
+  border-color: rgba(244, 63, 94, 0.4);
+}
+.love-btn:active {
+  transform: scale(0.94);
+}
+.love-btn:focus-visible {
+  outline: 2px solid rgba(244, 63, 94, 0.7);
+  outline-offset: 2px;
+}
+.love-heart {
+  height: 1rem;
+  width: 1rem;
+  color: rgba(231, 233, 238, 0.7);
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+.love-btn.is-liked .love-heart {
+  color: #f43f5e;
+  animation: love-pop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+.love-count {
+  font-variant-numeric: tabular-nums;
+}
+.love-btn--lg {
+  padding: 0.5rem 0.95rem;
+  font-size: 0.9rem;
+  gap: 0.45rem;
+  border-radius: 0.75rem;
+}
+.love-btn--lg .love-heart {
+  height: 1.3rem;
+  width: 1.3rem;
+}
+.love-btn--static,
+.love-btn--static:hover {
+  cursor: default;
+  transform: none;
+}
+
+@keyframes love-pop {
+  0% {
+    transform: scale(0.55);
+  }
+  40% {
+    transform: scale(1.4);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* --- Scroll-reveal motion system (#6) -------------------------------------------------------------------
+   Progressive enhancement: content is FULLY VISIBLE by default. Scripts/site.ts adds `.motion-ready` to
+   <html> ONLY when motion is allowed (JS present AND IntersectionObserver supported AND prefers-reduced-motion
+   is NOT set) — so no-JS and reduced-motion users never see the hidden pre-reveal state. The observer then
+   adds `.is-revealed` to each element (or group) as it scrolls into view. A standalone [data-reveal] reveals
+   itself; a [data-reveal-group] reveals its direct children together, staggered. */
+.motion-ready [data-reveal],
+.motion-ready [data-reveal-group] > * {
+  opacity: 0;
+  transform: translateY(16px);
+  /* opacity eases on expo.out (Bezier 0.16,1,0.3,1 — the house easing); the transform overshoots slightly on
+     back.out, the ui-ux-pro-max "Stagger List (Standard)" easing for entertainment poster grids. Durations sit
+     in the recommended 300–550ms window. */
+  transition:
+    opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.motion-ready [data-reveal].is-revealed,
+.motion-ready [data-reveal-group].is-revealed > * {
+  opacity: 1;
+  transform: none;
+}
+/* Stagger the children of a revealed group so a grid/list cascades in rather than snapping as one block. */
+.motion-ready [data-reveal-group].is-revealed > *:nth-child(2) { transition-delay: 0.05s; }
+.motion-ready [data-reveal-group].is-revealed > *:nth-child(3) { transition-delay: 0.1s; }
+.motion-ready [data-reveal-group].is-revealed > *:nth-child(4) { transition-delay: 0.15s; }
+.motion-ready [data-reveal-group].is-revealed > *:nth-child(5) { transition-delay: 0.2s; }
+.motion-ready [data-reveal-group].is-revealed > *:nth-child(6) { transition-delay: 0.25s; }
+.motion-ready [data-reveal-group].is-revealed > *:nth-child(7) { transition-delay: 0.3s; }
+.motion-ready [data-reveal-group].is-revealed > *:nth-child(8) { transition-delay: 0.35s; }
+.motion-ready [data-reveal-group].is-revealed > *:nth-child(n + 9) { transition-delay: 0.4s; }
+
+/* --- Dynamic iconography (#10) -----------------------------------------------------------------------------
+   Cohesive, alive icon language: every icon in the top bar / drawer lifts + scales a touch on hover or keyboard
+   focus, and the brand mark scales as one. Transform-only, so the global reduced-motion rule above neutralises
+   it. Scoped to <header> so it never disturbs content-area SVGs (poster badges, rating stars). */
+header nav a svg,
+header nav button svg {
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+header nav a:hover svg,
+header nav a:focus-visible svg,
+header nav button:hover svg,
+header nav button:focus-visible svg {
+  transform: translateY(-1px) scale(1.12);
+}
+/* The brand lockup: gently float the play triangle + breathe the glow on hover (the logo is one <a> in the bar). */
+header nav a:hover .logo-mark {
+  transform: scale(1.06) rotate(-2deg);
+}
+.logo-mark {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: center;
+}
+
+/* --- Login hero (#11) --------------------------------------------------------------------------------------
+   A cinematic split hero for the sign-in screen: layered gold spotlight orbs drift slowly behind a glass panel,
+   a film-strip motif, and a shimmer that sweeps the headline accent. All decorative + transform/opacity only —
+   the global reduced-motion rule collapses every animation to a still frame. */
+.hero-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  will-change: transform;
+  pointer-events: none;
+}
+.hero-orb--gold {
+  background: radial-gradient(circle, rgba(235, 189, 87, 0.28), rgba(235, 189, 87, 0));
+  animation: hero-drift-a 14s ease-in-out infinite;
+}
+.hero-orb--violet {
+  background: radial-gradient(circle, rgba(129, 90, 245, 0.22), rgba(129, 90, 245, 0));
+  animation: hero-drift-b 18s ease-in-out infinite;
+}
+.hero-shimmer {
+  background: linear-gradient(100deg, var(--color-accent) 30%, #fff4d6 50%, var(--color-accent) 70%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: hero-shimmer 6s linear infinite;
+}
+.hero-strip-cell {
+  animation: hero-strip-pulse 3.2s ease-in-out infinite;
+}
+/* Per-cell stagger (CSP forbids inline style attributes, so it lives here, not on the element). */
+.hero-strip .hero-strip-cell:nth-child(1) { animation-delay: 0s; }
+.hero-strip .hero-strip-cell:nth-child(2) { animation-delay: 0.18s; }
+.hero-strip .hero-strip-cell:nth-child(3) { animation-delay: 0.36s; }
+.hero-strip .hero-strip-cell:nth-child(4) { animation-delay: 0.54s; }
+.hero-strip .hero-strip-cell:nth-child(5) { animation-delay: 0.72s; }
+.hero-strip .hero-strip-cell:nth-child(6) { animation-delay: 0.9s; }
+.hero-strip .hero-strip-cell:nth-child(7) { animation-delay: 1.08s; }
+.hero-strip .hero-strip-cell:nth-child(8) { animation-delay: 1.26s; }
+.hero-strip .hero-strip-cell:nth-child(9) { animation-delay: 1.44s; }
+
+/* --- Landing hero: floating poster wall --------------------------------------------------------------------
+   A cinematic wall of drifting "poster" tiles beneath the landing headline. Each tile floats on its own
+   staggered loop; the middle pair sits a touch taller for a subtle fan/depth. Transform-only → the global
+   reduced-motion rule freezes it. */
+.hero-poster {
+  aspect-ratio: 2 / 3;
+  border-radius: 0.85rem;
+  border: 1px solid oklch(1 0 0 / 0.08);
+  box-shadow: 0 24px 46px -26px rgba(0, 0, 0, 0.85);
+  animation: hero-poster-float 6s ease-in-out infinite;
+  will-change: transform;
+}
+/* Repeating gold / indigo / violet tints so a strip of any length stays varied. */
+.hero-poster:nth-child(3n + 1) { background: linear-gradient(150deg, oklch(0.32 0.07 85 / 0.85), oklch(0.13 0.02 85 / 0.92)); }
+.hero-poster:nth-child(3n + 2) { background: linear-gradient(150deg, oklch(0.3 0.04 265 / 0.9), oklch(0.13 0.02 265 / 0.92)); animation-delay: 1s; }
+.hero-poster:nth-child(3n) { background: linear-gradient(150deg, oklch(0.32 0.09 300 / 0.82), oklch(0.13 0.03 300 / 0.92)); animation-delay: 1.8s; }
+@keyframes hero-poster-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Scrolling marquee of poster tiles — edge-masked, seamless -50% loop (the track is two identical halves). */
+.hero-marquee {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+}
+.hero-marquee-track {
+  display: flex;
+  width: max-content;
+  gap: 0.75rem;
+  padding-inline: 0.375rem;
+  animation: hero-marquee-scroll 46s linear infinite;
+}
+.hero-marquee .hero-poster {
+  width: 8.5rem;
+  flex: 0 0 auto;
+}
+@keyframes hero-marquee-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* Landing scroll cue — a gentle downward bounce. */
+.hero-scroll-cue {
+  animation: hero-bounce 2.2s ease-in-out infinite;
+}
+@keyframes hero-bounce {
+  0%, 100% { transform: translateY(0); opacity: 0.5; }
+  50% { transform: translateY(6px); opacity: 1; }
+}
+@keyframes hero-drift-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(6%, -8%, 0) scale(1.12); }
+}
+@keyframes hero-drift-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.05); }
+  50% { transform: translate3d(-7%, 6%, 0) scale(0.92); }
+}
+@keyframes hero-shimmer {
+  to { background-position: -200% center; }
+}
+@keyframes hero-strip-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.85; }
+}
+
+/* --- Aurora background (canvas mesh gradient, auth/form/hero pages) ----------------------------------------
+   On aurora pages the <body> background is made transparent so the fixed .aurora-bg layer (z-index:-1) shows
+   between the <html> surface-0 base and the page content — the reliable way to full-bleed a backdrop behind
+   in-flow content. Scripts/components/aurora.ts paints the canvas; the vignette sinks the edges back into
+   surface-0 so foreground text stays readable. Decorative + pointer-events:none. */
+body.has-aurora {
+  background-color: transparent;
+  background-image: none;
+}
+.aurora-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.aurora-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  filter: blur(20px) saturate(1.15);
+  opacity: 0.9;
+}
+.aurora-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(130% 100% at 50% 0%, transparent 38%, var(--color-surface-0) 100%),
+    linear-gradient(to bottom, transparent 55%, var(--color-surface-0) 100%);
+}
+
+/* --- Spotlight cards (pointer-follow glow) -----------------------------------------------------------------
+   A soft brand glow that tracks the pointer across a glass card. site.ts sets --spot-x/--spot-y via the CSSOM
+   (CSP-safe); the glow is a pure-CSS ::before radial-gradient sitting ABOVE the card's translucent bg but
+   BELOW its content (z-index:-1 under isolation), so it never washes out text. Fades in on hover only. The
+   global reduced-motion rule + the site.ts hover/pointer guard mean touch + reduced-motion users get nothing. */
+[data-spotlight] {
+  position: relative;
+  isolation: isolate;
+}
+[data-spotlight]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s var(--ease-standard);
+  background: radial-gradient(
+    260px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+    oklch(0.82 0.13 85 / 0.14),
+    transparent 60%
+  );
+}
+[data-spotlight]:hover::before {
+  opacity: 1;
+}
+
+/* --- Premium primary CTA (gradient + sheen sweep) ----------------------------------------------------------
+   The main call-to-action gets a gold gradient, a soft glow shadow, and a light sheen that sweeps across on
+   hover. transform/opacity-only sheen, so the global reduced-motion rule neutralises the sweep. */
+.btn-primary {
+  background-image: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-strong) 100%);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 24px -10px oklch(0.82 0.13 85 / 0.55);
+}
+.btn-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 35%, oklch(1 0 0 / 0.35) 50%, transparent 65%);
+  transform: translateX(-130%);
+  transition: transform 0.6s var(--ease-out-expo);
+}
+.btn-primary:hover {
+  box-shadow: 0 10px 30px -8px oklch(0.82 0.13 85 / 0.7);
+}
+.btn-primary:hover::after {
+  transform: translateX(130%);
 }

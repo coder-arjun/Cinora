@@ -1,0 +1,10 @@
+@*
+    Premium animated aurora backdrop for auth / form / hero pages. The <canvas> is painted by
+    Scripts/components/aurora.ts (canvas 2D — CSP-safe, no inline script/style). Purely decorative and
+    pointer-events:none; the vignette sinks the edges back into surface-0 so foreground text stays readable.
+    Rendered by _Layout when a page sets ViewData["Aurora"] = true. Reduced motion → a single static frame.
+*@
+<div class="aurora-bg" aria-hidden="true">
+    <canvas data-aurora class="aurora-canvas"></canvas>
+    <div class="aurora-vignette"></div>
+</div>

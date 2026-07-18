@@ -1,22 +1,26 @@
 @{
     ViewData["Title"] = "Welcome";
+    ViewData["Aurora"] = true;
 }
 
+@*
+    The landing hero. The animated aurora backdrop is rendered app-wide by _Layout (ViewData["Aurora"]). The
+    hero content cascades in on load (data-reveal-group + the back.out stagger in app.css), the accent word
+    shimmers, and a floating poster wall drifts beneath — all transform/opacity only, so the global
+    reduced-motion rule collapses every animation to a still frame. CSP-safe (no inline JS/style).
+*@
 <section class="relative isolate overflow-hidden">
-    @* Cinematic backdrop — a soft gold glow over a scrim into the page background. No image asset
-       needed yet; the gradient reads as a lit backdrop. All colours are design tokens. *@
-    <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div class="absolute -top-24 left-1/2 h-96 w-full max-w-3xl -translate-x-1/2 rounded-full bg-accent/10 blur-3xl"></div>
-        <div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-surface-0"></div>
-    </div>
-
-    <div class="animate-rise-in mx-auto flex max-w-6xl flex-col items-center px-4 py-24 text-center sm:px-6 sm:py-32 lg:py-40">
-        <p class="mb-6 inline-flex items-center gap-2 rounded-pill border border-white/10 bg-surface-1/60 px-4 py-1.5 text-xs font-medium uppercase tracking-widest text-ink-subtle backdrop-blur-glass">
-            Social film reviews
+    <div class="mx-auto flex max-w-6xl flex-col items-center px-4 py-24 text-center sm:px-6 sm:py-28 lg:py-36" data-reveal-group>
+        <p class="inline-flex items-center gap-2 rounded-pill border border-white/10 bg-surface-1/60 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-accent backdrop-blur-glass">
+            <svg viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
+                <path d="M10 1.5l2.47 5.01 5.53.8-4 3.9.94 5.49L10 14.1l-4.95 2.6.94-5.49-4-3.9 5.53-.8z" />
+            </svg>
+            Social reviews for film &amp; series
         </p>
 
-        <h1 class="font-display text-display font-semibold text-ink">
-            Discover your next <span class="text-accent">obsession.</span>
+        <h1 class="mt-6 font-display text-display font-semibold leading-[1.03] text-ink">
+            Discover your next<br class="hidden sm:block" />
+            <span class="hero-shimmer">obsession.</span>
         </h1>
 
         <p class="mt-6 max-w-2xl text-lg text-ink-muted">
@@ -42,5 +46,25 @@
             Already have an account?
             <a asp-controller="Account" asp-action="Login" class="link">Sign in</a>
         </p>
+    </div>
+
+    @* Animated scroll cue — a gently bouncing chevron inviting the eye downward. Sibling of the reveal group
+       so its bounce animation never fights the reveal transition. *@
+    <div class="mb-8 hidden justify-center sm:flex" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="hero-scroll-cue h-6 w-6 text-ink-subtle">
+            <path d="M6 9l6 6 6-6" />
+        </svg>
+    </div>
+
+    @* A continuously scrolling marquee of "poster" tiles — the cinema-wall motif in motion. Edge-masked; each
+       tile also bobs on its own loop. Reduced-motion freezes it to a static strip (global rule). 18 tiles =
+       two identical halves (tints repeat every 3), so translateX(-50%) loops seamlessly. *@
+    <div class="hero-marquee pb-24" data-reveal aria-hidden="true">
+        <div class="hero-marquee-track">
+            @for (var i = 0; i < 18; i++)
+            {
+                <div class="hero-poster"></div>
+            }
+        </div>
     </div>
 </section>

@@ -44,6 +44,8 @@ internal sealed class ProfilesTestDbContext(DbContextOptions<ProfilesTestDbConte
 
     DbSet<ReviewLike> IAppDbContext.ReviewLikes => throw Unsupported();
 
+    DbSet<MovieLike> IAppDbContext.MovieLikes => throw Unsupported();
+
     DbSet<Comment> IAppDbContext.Comments => throw Unsupported();
 
     DbSet<Watchlist> IAppDbContext.Watchlists => throw Unsupported();
@@ -82,6 +84,7 @@ internal sealed class ProfilesTestDbContext(DbContextOptions<ProfilesTestDbConte
         modelBuilder.Ignore<MovieGenre>();
         modelBuilder.Ignore<Review>();
         modelBuilder.Ignore<ReviewLike>();
+        modelBuilder.Ignore<MovieLike>();
         modelBuilder.Ignore<Comment>();
         modelBuilder.Ignore<Watchlist>();
         modelBuilder.Ignore<Notification>();

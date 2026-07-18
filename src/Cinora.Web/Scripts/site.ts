@@ -15,6 +15,7 @@ import { registerNavMenu } from "./components/navMenu";
 import { registerAccountMenu } from "./components/accountMenu";
 import { registerTour } from "./components/tour";
 import { registerLanguageSelect } from "./components/languageSelect";
+import { initAurora } from "./components/aurora";
 
 declare global {
   interface Window {
@@ -1792,6 +1793,77 @@ registerTour(Alpine);
 registerLanguageSelect(Alpine);
 
 Alpine.start();
+
+// --- Scroll-reveal motion system (#6) ---------------------------------------------------------------------
+// Reveals [data-reveal] / [data-reveal-group] elements as they scroll into view (app.css hides them only
+// under the `.motion-ready` class this adds). Progressive enhancement + accessibility: if IntersectionObserver
+// is unavailable OR the user prefers reduced motion, we DON'T add `.motion-ready`, so content stays fully
+// visible with no animation. Elements reveal once, then are unobserved.
+function initScrollReveal(): void {
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduced || typeof IntersectionObserver === "undefined") {
+    return;
+  }
+  document.documentElement.classList.add("motion-ready");
+
+  const observer = new IntersectionObserver(
+    (entries, obs) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-revealed");
+          obs.unobserve(entry.target);
+        }
+      }
+    },
+    { rootMargin: "0px 0px -8% 0px", threshold: 0.05 },
+  );
+
+  const scan = (scope: ParentNode): void => {
+    scope.querySelectorAll<HTMLElement>("[data-reveal], [data-reveal-group]").forEach((el) => {
+      if (el.dataset.revealBound === "true") {
+        return;
+      }
+      el.dataset.revealBound = "true";
+      observer.observe(el);
+    });
+  };
+
+  scan(document);
+  // Re-scan content injected after an HTMX swap (rails streaming in, load-more pages).
+  document.addEventListener("htmx:afterSwap", (event) => {
+    const target = (event as CustomEvent<{ target?: Element }>).detail?.target ?? event.target;
+    if (target instanceof Element) {
+      scan(target);
+    }
+  });
+}
+
+initScrollReveal();
+
+// --- Spotlight cards (21st-style) --------------------------------------------------------------------------
+// A soft brand glow that follows the pointer across any [data-spotlight] element (glass cards, CTAs). CSP-safe:
+// only sets two CSS custom properties via the CSSOM (allowed under style-src 'self' — same as the rest of the
+// app's el.style usage); the glow itself is a pure-CSS ::before radial-gradient (app.css). Skipped under
+// reduced-motion (a pointer-tracking highlight can be disorienting), and only bound when the pointer is fine
+// (hover-capable) so touch devices don't pay for an effect they can't see.
+function initSpotlight(): void {
+  if (
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+    !window.matchMedia("(hover: hover) and (pointer: fine)").matches
+  ) {
+    return;
+  }
+  document.querySelectorAll<HTMLElement>("[data-spotlight]").forEach((card) => {
+    card.addEventListener("pointermove", (event) => {
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty("--spot-x", `${event.clientX - rect.left}px`);
+      card.style.setProperty("--spot-y", `${event.clientY - rect.top}px`);
+    });
+  });
+}
+
+initSpotlight();
+initAurora();
 
 void connectNotifications();
 

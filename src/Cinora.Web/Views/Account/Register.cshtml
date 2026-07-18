@@ -1,11 +1,12 @@
 @model RegisterViewModel
 @{
     ViewData["Title"] = "Create your account";
+    ViewData["Aurora"] = true;
     ViewData["MinimalNav"] = true;
 }
 
 <section class="mx-auto flex w-full max-w-md flex-col px-4 py-16 sm:py-24">
-    <div class="card-glass animate-rise-in p-6 sm:p-8">
+    <div class="card-glass animate-rise-in p-6 sm:p-8" data-spotlight>
         <h1 class="font-display text-3xl text-ink">Create your account</h1>
         <p class="mt-2 text-sm text-ink-muted">Join Cinora and start rating what you watch.</p>
 

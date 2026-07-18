@@ -14,13 +14,15 @@ namespace Cinora.Web.ViewModels.Discovery;
 /// <param name="Language">The effective original-language filter (lower-case ISO-639-1); <c>null</c> = Global.</param>
 public sealed record HomeFeedViewModel(IReadOnlyList<RailSlot> Rails, string? Language)
 {
-    // The three Movie rails the shell renders (Trending, Popular, Top Rated). Series rails + a media toggle
-    // remain deferred; the language filter (added here) reuses these same rail slots.
+    // Movie rails then Series rails (each lazy-loaded independently). The language filter reuses these slots.
     private static readonly IReadOnlyList<RailSlot> DefaultRails =
     [
-        new RailSlot(RailKind.Trending, MediaType.Movie, "Trending This Week"),
-        new RailSlot(RailKind.Popular, MediaType.Movie, "Popular"),
-        new RailSlot(RailKind.TopRated, MediaType.Movie, "Top Rated"),
+        new RailSlot(RailKind.Trending, MediaType.Movie, "Trending Movies"),
+        new RailSlot(RailKind.Popular, MediaType.Movie, "Popular Movies"),
+        new RailSlot(RailKind.TopRated, MediaType.Movie, "Top Rated Movies"),
+        new RailSlot(RailKind.Trending, MediaType.Series, "Trending Series"),
+        new RailSlot(RailKind.Popular, MediaType.Series, "Popular Series"),
+        new RailSlot(RailKind.TopRated, MediaType.Series, "Top Rated Series"),
     ];
 
     /// <summary>The default Global shell (no original-language filter).</summary>

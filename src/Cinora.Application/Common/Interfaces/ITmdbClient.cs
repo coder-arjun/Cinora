@@ -40,6 +40,17 @@ public interface ITmdbClient
     /// <returns>One page of matching title summaries with paging metadata.</returns>
     Task<TmdbPage<TmdbTitleSummary>> SearchAsync(MediaType media, string query, int page, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Searches TMDB across ALL title kinds at once (movies AND series) via <c>search/multi</c> — the unified
+    /// search behind one box. Each returned summary carries its own <see cref="TmdbTitleSummary.MediaType"/>;
+    /// non-title results (people) are dropped.
+    /// </summary>
+    /// <param name="query">The search text (the caller is expected to have validated it non-empty).</param>
+    /// <param name="page">The 1-based page to fetch.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>One page of matching movie + series summaries with paging metadata.</returns>
+    Task<TmdbPage<TmdbTitleSummary>> SearchMultiAsync(string query, int page, CancellationToken cancellationToken);
+
     /// <summary>Gets the full details of a single title, including its genres and a ranked cast summary.</summary>
     /// <param name="media">Whether the title is a movie or a series.</param>
     /// <param name="tmdbId">The TMDB identifier of the title.</param>
@@ -88,4 +99,13 @@ public interface ITmdbClient
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>The discovered title summaries (first page); empty when TMDB returned nothing.</returns>
     Task<IReadOnlyList<TmdbTitleSummary>> GetRegionalRailAsync(MediaType media, RailKind kind, string originalLanguage, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gets a person (actor) and their acting filmography (TMDB <c>person/{id}</c> with
+    /// <c>combined_credits</c>) — the "click a cast member to see their titles" fan-out (feature #9).
+    /// </summary>
+    /// <param name="personId">The TMDB person identifier.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The person with their acting credits, or <c>null</c> when TMDB has no such person (404).</returns>
+    Task<TmdbPersonCredits?> GetPersonCreditsAsync(int personId, CancellationToken cancellationToken);
 }

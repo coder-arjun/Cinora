@@ -45,6 +45,9 @@ public interface IAppDbContext
     /// <summary>The likes recorded against reviews.</summary>
     DbSet<ReviewLike> ReviewLikes { get; }
 
+    /// <summary>The title-level "loves" (the poster love button).</summary>
+    DbSet<MovieLike> MovieLikes { get; }
+
     /// <summary>The comments recorded against reviews.</summary>
     DbSet<Comment> Comments { get; }
 

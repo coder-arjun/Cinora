@@ -10,5 +10,8 @@
       "PowerShell(git push)",
       "PowerShell(git push:*)"
     ]
+  },
+  "enabledPlugins": {
+    "21st@21st": true
   }
 }

@@ -72,6 +72,8 @@ internal sealed class TestAppDbContext(DbContextOptions<TestAppDbContext> option
 
     DbSet<ReviewLike> IAppDbContext.ReviewLikes => throw Unsupported();
 
+    DbSet<MovieLike> IAppDbContext.MovieLikes => throw Unsupported();
+
     DbSet<Comment> IAppDbContext.Comments => throw Unsupported();
 
     DbSet<Notification> IAppDbContext.Notifications => throw Unsupported();
@@ -99,6 +101,7 @@ internal sealed class TestAppDbContext(DbContextOptions<TestAppDbContext> option
         modelBuilder.Ignore<ConversationMember>();
         modelBuilder.Ignore<Message>();
         modelBuilder.Ignore<ReviewLike>();
+        modelBuilder.Ignore<MovieLike>();
         modelBuilder.Ignore<Comment>();
         modelBuilder.Ignore<Notification>();
         modelBuilder.Ignore<Device>();

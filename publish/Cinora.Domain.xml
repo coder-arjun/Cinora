@@ -450,6 +450,28 @@
             <param name="genreId">The genre identifier.</param>
             <returns>A new <see cref="T:Cinora.Domain.Entities.MovieGenre"/> join record.</returns>
         </member>
+        <member name="T:Cinora.Domain.Entities.MovieLike">
+            <summary>
+            Records that a user "loves" a title (a movie/series-level like, distinct from a <see cref="T:Cinora.Domain.Entities.Review"/>). There is
+            no surrogate key; the pair (<see cref="P:Cinora.Domain.Entities.MovieLike.MovieId"/>, <see cref="P:Cinora.Domain.Entities.MovieLike.UserId"/>) is the composite key, which guarantees
+            a user can love a title at most once. Drives the poster love button + count and the "most loved" sort.
+            </summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.MovieLike.MovieId">
+            <summary>The identifier of the loved <see cref="T:Cinora.Domain.Entities.Movie"/> (internal id, not the TMDB id).</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.MovieLike.UserId">
+            <summary>The identifier of the user who loved the title.</summary>
+        </member>
+        <member name="P:Cinora.Domain.Entities.MovieLike.LikedAtUtc">
+            <summary>The UTC instant the love was recorded.</summary>
+        </member>
+        <member name="M:Cinora.Domain.Entities.MovieLike.Create(System.Guid,System.Guid)">
+            <summary>Records that a user loves a title.</summary>
+            <param name="movieId">The loved title's internal identifier.</param>
+            <param name="userId">The loving user's identifier.</param>
+            <returns>A new <see cref="T:Cinora.Domain.Entities.MovieLike"/>.</returns>
+        </member>
         <member name="T:Cinora.Domain.Entities.Notification">
             <summary>
             An in-app notification delivered to a recipient about a social event (a friend request, a like,

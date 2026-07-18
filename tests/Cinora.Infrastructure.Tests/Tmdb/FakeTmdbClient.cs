@@ -24,6 +24,9 @@ internal sealed class FakeTmdbClient : ITmdbClient
     /// <summary>The number of times <see cref="SearchAsync"/> was invoked.</summary>
     public int SearchCount { get; private set; }
 
+    /// <summary>The number of times <see cref="SearchMultiAsync"/> was invoked.</summary>
+    public int SearchMultiCount { get; private set; }
+
     /// <summary>The number of times <see cref="GetDetailsAsync"/> was invoked.</summary>
     public int GetDetailsCount { get; private set; }
 
@@ -38,6 +41,12 @@ internal sealed class FakeTmdbClient : ITmdbClient
 
     /// <summary>The number of times <see cref="GetRegionalRailAsync"/> was invoked.</summary>
     public int GetRegionalCount { get; private set; }
+
+    /// <summary>The number of times <see cref="GetPersonCreditsAsync"/> was invoked.</summary>
+    public int GetPersonCount { get; private set; }
+
+    /// <summary>The canned person result; set to <c>null</c> to model a 404.</summary>
+    public TmdbPersonCredits? PersonResult { get; set; } = Person(6193, "Leonardo DiCaprio");
 
     /// <summary>The canned rail (trending/popular/top-rated) result.</summary>
     public IReadOnlyList<TmdbTitleSummary> RailResult { get; set; } = [Summary(27205, "Inception")];
@@ -80,6 +89,13 @@ internal sealed class FakeTmdbClient : ITmdbClient
     }
 
     /// <inheritdoc />
+    public Task<TmdbPage<TmdbTitleSummary>> SearchMultiAsync(string query, int page, CancellationToken cancellationToken)
+    {
+        SearchMultiCount++;
+        return Task.FromResult(SearchResult);
+    }
+
+    /// <inheritdoc />
     public Task<TmdbTitleDetails?> GetDetailsAsync(MediaType media, int tmdbId, CancellationToken cancellationToken)
     {
         GetDetailsCount++;
@@ -114,6 +130,13 @@ internal sealed class FakeTmdbClient : ITmdbClient
         return Task.FromResult(RailResult);
     }
 
+    /// <inheritdoc />
+    public Task<TmdbPersonCredits?> GetPersonCreditsAsync(int personId, CancellationToken cancellationToken)
+    {
+        GetPersonCount++;
+        return Task.FromResult(PersonResult);
+    }
+
     /// <summary>Builds a summary read model with the given id and title.</summary>
     public static TmdbTitleSummary Summary(int tmdbId, string title) => new()
     {
@@ -145,6 +168,15 @@ internal sealed class FakeTmdbClient : ITmdbClient
         TotalPages = 1,
         TotalResults = 1,
         Items = [Summary(tmdbId, title)],
+    };
+
+    /// <summary>Builds a person read model with the given id and name (one canned acting credit).</summary>
+    public static TmdbPersonCredits Person(int personId, string name) => new()
+    {
+        PersonId = personId,
+        Name = name,
+        ProfilePath = "/profile.jpg",
+        Titles = [Summary(27205, "Inception")],
     };
 
     /// <summary>Builds an empty (zero-result) search page — a search miss.</summary>

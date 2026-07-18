@@ -90,6 +90,12 @@ internal sealed class FakeTmdbClient : ITmdbClient
     /// </summary>
     public Dictionary<string, IReadOnlyList<TmdbTitleSummary>> RegionalRails { get; } = [];
 
+    /// <summary>
+    /// Canned person filmographies keyed by TMDB person id, returned by <see cref="GetPersonCreditsAsync"/>
+    /// (feature #9). An absent id models a TMDB 404 — the method returns <c>null</c>.
+    /// </summary>
+    public Dictionary<int, TmdbPersonCredits> People { get; } = [];
+
     public Task<IReadOnlyList<TmdbGenre>> GetGenresAsync(MediaType media, CancellationToken cancellationToken) =>
         Task.FromResult(media == MediaType.Movie ? MovieGenres : SeriesGenres);
 
@@ -131,6 +137,18 @@ internal sealed class FakeTmdbClient : ITmdbClient
                 Items = SearchPages.GetValueOrDefault(page, []),
             });
 
+    // The unified search (movies + series). Tests seed the same SearchPages; ThrowOnSearch models an outage.
+    public Task<TmdbPage<TmdbTitleSummary>> SearchMultiAsync(string query, int page, CancellationToken cancellationToken) =>
+        ThrowOnSearch
+            ? throw SearchOutage()
+            : Task.FromResult(new TmdbPage<TmdbTitleSummary>
+            {
+                Page = page,
+                TotalPages = SearchTotalPages,
+                TotalResults = SearchTotalResults,
+                Items = SearchPages.GetValueOrDefault(page, []),
+            });
+
     // Models the exception the real HTTP client surfaces after its resilience pipeline gives up, so the
     // controller's graceful-degradation catch (→ _SearchError, HTTP 200) is exercised end-to-end.
     private static HttpRequestException SearchOutage() =>
@@ -147,4 +165,7 @@ internal sealed class FakeTmdbClient : ITmdbClient
         ThrowOnRails
             ? throw RailOutage()
             : Task.FromResult(RegionalRails.GetValueOrDefault(originalLanguage.ToLowerInvariant(), []));
+
+    public Task<TmdbPersonCredits?> GetPersonCreditsAsync(int personId, CancellationToken cancellationToken) =>
+        Task.FromResult(People.TryGetValue(personId, out var person) ? person : null);
 }

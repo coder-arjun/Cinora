@@ -18,7 +18,8 @@ namespace Cinora.Application.Features.Discovery;
 /// decorator (15-min TTL, trim+lower normalized key), so this handler stays cache-oblivious.
 /// </remarks>
 /// <param name="Query">The free-text search term (validated non-empty, 1–100 chars).</param>
-/// <param name="Media">Whether to search movies or series (defaults to <see cref="MediaType.Movie"/>).</param>
+/// <param name="Media">Retained only to echo back into the load-more sentinel URL; the search itself now spans
+/// ALL media (movies + series) via <c>search/multi</c>, so this no longer scopes the results.</param>
 /// <param name="Page">The 1-based TMDB result page to fetch (defaults to 1).</param>
 public sealed record SearchTitlesQuery(string Query, MediaType Media = MediaType.Movie, int Page = 1)
     : IRequest<SearchResultsVm>;
@@ -55,9 +56,9 @@ public sealed record SearchResultsVm
 }
 
 /// <summary>
-/// Handles <see cref="SearchTitlesQuery"/> by calling <see cref="ITmdbClient.SearchAsync"/> and projecting
-/// each returned summary to a <see cref="TitleCardVm"/> via the shared <see cref="TitleCardVm.FromSummary"/>
-/// factory (the same projection the rail handler uses).
+/// Handles <see cref="SearchTitlesQuery"/> by calling <see cref="ITmdbClient.SearchMultiAsync"/> (movies AND
+/// series in one set) and projecting each returned summary to a <see cref="TitleCardVm"/> via the shared
+/// <see cref="TitleCardVm.FromSummary"/> factory (the same projection the rail handler uses).
 /// </summary>
 /// <param name="tmdb">The TMDB read port — the handler's ONLY dependency (no DB, no mediator).</param>
 public sealed class SearchTitlesQueryHandler(ITmdbClient tmdb)
@@ -71,9 +72,16 @@ public sealed class SearchTitlesQueryHandler(ITmdbClient tmdb)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var page = await tmdb.SearchAsync(request.Media, request.Query, request.Page, cancellationToken);
+        // Unified search across all forms — movies AND series (feature: series search). Each card carries its
+        // own media type (from search/multi), so links route correctly and the maps resolve per (id, media).
+        var page = await tmdb.SearchMultiAsync(request.Query, request.Page, cancellationToken);
 
-        var items = page.Items.Select(TitleCardVm.FromSummary).ToArray();
+        // Order each page newest-first by release year (TMDB search returns relevance order and offers no sort;
+        // a null/unknown year sorts last). Paged, so this is a per-page newest-first ordering.
+        var items = page.Items
+            .Select(TitleCardVm.FromSummary)
+            .OrderByDescending(card => card.ReleaseYear ?? int.MinValue)
+            .ToArray();
         return new SearchResultsVm
         {
             Items = items,

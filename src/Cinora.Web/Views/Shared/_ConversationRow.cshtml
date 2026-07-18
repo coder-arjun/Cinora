@@ -10,6 +10,7 @@
     realtime client re-connects per page like notifications). Names/previews are Razor @-encoded.
 *@
 <a asp-controller="Chat" asp-action="Thread" asp-route-id="@Model.Id" data-conversation-id="@Model.Id"
+   data-conversation-name="@Model.Title.ToLowerInvariant()"
    class="flex items-center gap-3 rounded-card border px-3 py-2.5 transition-colors @(isActive ? "border-accent/40 bg-accent/10" : "border-white/5 bg-surface-1/40 hover:border-white/10 hover:bg-surface-1/70")">
     @if (Model.Type == ConversationType.Group)
     {

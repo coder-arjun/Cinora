@@ -128,6 +128,56 @@ public sealed class DetailsTests : IAsyncLifetime
         Assert.DoesNotContain("unsafe-eval", csp, StringComparison.Ordinal);
     }
 
+    // D6 — each cast member on Details links to their person page (/discover/person/{id}); feature #9 click-through.
+    [Fact]
+    public async Task Details_cast_members_link_to_the_person_page()
+    {
+        var fake = FakeWithMovie();
+        using var factory = CreateFactoryWith(fake);
+        using var viewer = await AuthedAsync(factory);
+        var client = viewer.Client;
+
+        using var response = await client.GetAsync($"/discover/title/movie/{MovieTmdbId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("/discover/person/1", body, StringComparison.Ordinal); // Jane Lead
+        Assert.Contains("/discover/person/2", body, StringComparison.Ordinal); // John Support
+    }
+
+    // D7 — the person page renders the actor and their top-rated titles (feature #9: cast → their films),
+    // mixing movies + series, each linking to its own media route.
+    [Fact]
+    public async Task Person_page_returns_the_actor_and_their_top_titles()
+    {
+        var fake = new FakeTmdbClient();
+        fake.People[6193] = new TmdbPersonCredits
+        {
+            PersonId = 6193,
+            Name = "Leo Star",
+            ProfilePath = "/leo.jpg",
+            Titles =
+            [
+                new TmdbTitleSummary { TmdbId = 27205, MediaType = MediaType.Movie, Title = "Inception", PosterPath = "/incep.jpg", VoteAverage = 8.4, VoteCount = 30000, ReleaseDate = new DateOnly(2010, 7, 16) },
+                new TmdbTitleSummary { TmdbId = 1396, MediaType = MediaType.Series, Title = "Breaking Something", PosterPath = "/bb.jpg", VoteAverage = 8.9, VoteCount = 12000, ReleaseDate = new DateOnly(2008, 1, 20) },
+            ],
+        };
+        using var factory = CreateFactoryWith(fake);
+        using var viewer = await AuthedAsync(factory);
+        var client = viewer.Client;
+
+        using var response = await client.GetAsync("/discover/person/6193");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("Leo Star", body, StringComparison.Ordinal);           // the actor's name
+        Assert.Contains("Inception", body, StringComparison.Ordinal);          // a movie credit
+        Assert.Contains("/discover/title/movie/27205", body, StringComparison.Ordinal);
+        Assert.Contains("Breaking Something", body, StringComparison.Ordinal); // a series credit
+        Assert.Contains("/discover/title/series/1396", body, StringComparison.Ordinal);
+    }
+
     private static FakeTmdbClient FakeWithMovie()
     {
         var fake = new FakeTmdbClient();

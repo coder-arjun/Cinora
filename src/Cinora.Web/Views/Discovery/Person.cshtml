@@ -1,0 +1,52 @@
+@model PersonTitlesVm
+@{
+    ViewData["Title"] = Model.Name;
+}
+
+@*
+    Feature #9 — a cast member's page: the actor's name + photo, then a grid of their most notable titles
+    (best-rated first, resolved in GetPersonTitlesQuery). Reached from a linked cast card on the Details page.
+    Static, server-rendered; each poster reuses the shared _TitleCard (a self-contained link) — no watchlist /
+    love overlays here (those live on the discovery rails and Details), so the grid stays media-mixed-safe.
+    Images go through the TMDB tag-helper; a null profile path falls back to a monogram tile.
+*@
+<section class="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
+    <header class="animate-rise-in flex flex-col gap-6 sm:flex-row sm:items-end">
+        <div class="h-28 w-28 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-surface-1/60 shadow-glass sm:h-36 sm:w-36">
+            @if (Model.ProfilePath is not null)
+            {
+                <img asp-tmdb-poster="@Model.ProfilePath" asp-tmdb-size="W185" alt="@Model.Name"
+                     class="h-full w-full object-cover" />
+            }
+            else
+            {
+                <span class="flex h-full w-full items-center justify-center font-display text-4xl text-ink-subtle" aria-hidden="true">
+                    @(string.IsNullOrWhiteSpace(Model.Name) ? "?" : Model.Name.Trim()[..1].ToUpperInvariant())
+                </span>
+            }
+        </div>
+        <div>
+            <p class="inline-flex items-center gap-2 rounded-pill border border-white/10 bg-surface-1/60 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-accent backdrop-blur-glass">
+                Cast
+            </p>
+            <h1 class="mt-4 font-display text-display font-semibold text-ink">@Model.Name</h1>
+            <p class="mt-3 text-lg text-ink-muted">Best-rated films &amp; series</p>
+        </div>
+    </header>
+
+    @if (Model.Titles.Count == 0)
+    {
+        <p class="mt-12 text-ink-subtle">No notable titles to show for @Model.Name right now.</p>
+    }
+    else
+    {
+        <ul role="list" class="mt-10 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5 sm:mt-12" data-reveal-group>
+            @foreach (var card in Model.Titles)
+            {
+                <li data-reveal>
+                    <partial name="_TitleCard" model="card" />
+                </li>
+            }
+        </ul>
+    }
+</section>

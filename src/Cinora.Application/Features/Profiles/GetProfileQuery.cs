@@ -103,16 +103,17 @@ public sealed class GetProfileQueryHandler(IAppDbContext db, ICurrentUser curren
             ? await LoadWatchlistHighlightsAsync(ownerId, cancellationToken)
             : [];
 
-        var friends = isFullView
+        // Friend LIST is OWNER-ONLY: a visitor — even an accepted friend — must not see who your friends are.
+        // Privacy at the read (PH1): a non-owner view never fetches the list at all.
+        var isOwner = relationship is ProfileRelationship.Owner;
+        var friends = isOwner
             ? await FriendProjections.AcceptedFriendsAsync(db, ownerId, cancellationToken)
             : (IReadOnlyList<FriendVm>)[];
 
-        // A visible profile (full or public) shows the friend count; a limited profile reveals nothing.
-        var friendCount = isFullView
-            ? friends.Count
-            : canViewReviews
-                ? await FriendProjections.CountAcceptedFriendsAsync(db, ownerId, cancellationToken)
-                : 0;
+        // The friend COUNT stays visible on any viewable profile (full or public) — it reveals a number, not who.
+        var friendCount = canViewReviews
+            ? await FriendProjections.CountAcceptedFriendsAsync(db, ownerId, cancellationToken)
+            : 0;
 
         return new ProfileVm
         {
@@ -124,7 +125,7 @@ public sealed class GetProfileQueryHandler(IAppDbContext db, ICurrentUser curren
             IncomingRequestId = incomingRequestId,
             CanViewReviews = canViewReviews,
             CanViewWatchlist = canViewWatchlist,
-            CanViewFriends = isFullView,
+            CanViewFriends = isOwner,
             FriendCount = friendCount,
             Reviews = reviews,
             Friends = friends,

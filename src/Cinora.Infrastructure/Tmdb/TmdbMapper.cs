@@ -42,6 +42,40 @@ internal static class TmdbMapper
             Items = ToSummaries(page, media),
         };
 
+    /// <summary>
+    /// Maps a TMDB <c>search/multi</c> page to a paged read model, taking each result's media type from its own
+    /// <c>media_type</c> field (movies + series in one set) and DROPPING any non-title result (people, unknown) —
+    /// so the unified search returns only browsable titles.
+    /// </summary>
+    public static TmdbPage<TmdbTitleSummary> ToMultiPage(TmdbPagedDto<TmdbListItemDto>? page)
+    {
+        var items = new List<TmdbTitleSummary>(page?.Results?.Count ?? 0);
+        if (page?.Results is not null)
+        {
+            foreach (var item in page.Results)
+            {
+                var media = item.MediaType switch
+                {
+                    "movie" => MediaType.Movie,
+                    "tv" => MediaType.Series,
+                    _ => (MediaType?)null,
+                };
+                if (media is { } mediaType)
+                {
+                    items.Add(ToSummary(item, mediaType));
+                }
+            }
+        }
+
+        return new TmdbPage<TmdbTitleSummary>
+        {
+            Page = page?.Page ?? 0,
+            TotalPages = page?.TotalPages ?? 0,
+            TotalResults = page?.TotalResults ?? 0,
+            Items = items,
+        };
+    }
+
     /// <summary>Maps a TMDB details response to the details read model, or <c>null</c> when absent.</summary>
     public static TmdbTitleDetails? ToDetails(TmdbDetailsDto? dto, MediaType media)
     {
@@ -72,6 +106,23 @@ internal static class TmdbMapper
 
     /// <summary>Maps a TMDB genre-list response to genre read models (empty when null/absent).</summary>
     public static IReadOnlyList<TmdbGenre> ToGenres(TmdbGenreListDto? dto) => MapGenres(dto?.Genres);
+
+    /// <summary>Maps a TMDB person response (with combined credits) to the read model, or <c>null</c> when absent.</summary>
+    public static TmdbPersonCredits? ToPersonCredits(TmdbPersonDto? dto)
+    {
+        if (dto is null)
+        {
+            return null;
+        }
+
+        return new TmdbPersonCredits
+        {
+            PersonId = dto.Id,
+            Name = dto.Name ?? string.Empty,
+            ProfilePath = dto.ProfilePath,
+            Titles = MapPersonCredits(dto.CombinedCredits?.Cast),
+        };
+    }
 
     private static TmdbTitleSummary ToSummary(TmdbListItemDto item, MediaType media) =>
         new()
@@ -130,6 +181,47 @@ internal static class TmdbMapper
                 Order = member.Order ?? int.MaxValue,
             })
             .ToList();
+    }
+
+    // Returns the concrete List<T> (CA1859). Maps a person's acting credits to title summaries, skipping any
+    // credit whose media_type is neither "movie" nor "tv" (only those resolve to a browsable Details page).
+    private static List<TmdbTitleSummary> MapPersonCredits(IReadOnlyList<TmdbPersonCreditDto>? cast)
+    {
+        if (cast is null || cast.Count == 0)
+        {
+            return [];
+        }
+
+        var titles = new List<TmdbTitleSummary>(cast.Count);
+        foreach (var credit in cast)
+        {
+            var media = credit.MediaType switch
+            {
+                "movie" => MediaType.Movie,
+                "tv" => MediaType.Series,
+                _ => (MediaType?)null,
+            };
+            if (media is not { } mediaType)
+            {
+                continue;
+            }
+
+            titles.Add(new TmdbTitleSummary
+            {
+                TmdbId = credit.Id,
+                MediaType = mediaType,
+                Title = credit.Title ?? credit.Name ?? string.Empty,
+                Overview = Normalize(credit.Overview),
+                PosterPath = credit.PosterPath,
+                BackdropPath = credit.BackdropPath,
+                ReleaseDate = ParseDate(credit.ReleaseDate ?? credit.FirstAirDate),
+                VoteAverage = credit.VoteAverage ?? 0,
+                VoteCount = credit.VoteCount ?? 0,
+                GenreIds = credit.GenreIds ?? [],
+            });
+        }
+
+        return titles;
     }
 
     private static int? FirstRunTime(IReadOnlyList<int>? runtimes) =>

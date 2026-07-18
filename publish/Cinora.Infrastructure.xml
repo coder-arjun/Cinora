@@ -706,6 +706,18 @@
         <member name="M:Cinora.Infrastructure.Migrations.AddChatMovieShare.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
             <inheritdoc />
         </member>
+        <member name="T:Cinora.Infrastructure.Migrations.AddMovieLike">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.AddMovieLike.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.AddMovieLike.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Migrations.AddMovieLike.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
         <member name="T:Cinora.Infrastructure.Options.AdminDashboardOptions">
             <summary>
             Binds the <c>AdminDashboard</c> configuration section describing who may reach the admin-gated Hangfire
@@ -1173,6 +1185,9 @@
         <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.ReviewLikes">
             <summary>The likes recorded against reviews.</summary>
         </member>
+        <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.MovieLikes">
+            <summary>The title-level "loves" (the poster love button).</summary>
+        </member>
         <member name="P:Cinora.Infrastructure.Persistence.CinoraDbContext.Comments">
             <summary>The comments recorded against reviews.</summary>
         </member>
@@ -1251,6 +1266,9 @@
         </member>
         <member name="T:Cinora.Infrastructure.Persistence.Configurations.MovieGenreConfiguration">
             <summary>Maps the <see cref="T:Cinora.Domain.Entities.MovieGenre"/> join with its composite (MovieId, GenreId) key.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Persistence.Configurations.MovieLikeConfiguration">
+            <summary>Maps <see cref="T:Cinora.Domain.Entities.MovieLike"/> — the title-level "love" with the composite (MovieId, UserId) key.</summary>
         </member>
         <member name="T:Cinora.Infrastructure.Persistence.Configurations.NotificationConfiguration">
             <summary>Maps the <see cref="T:Cinora.Domain.Entities.Notification"/> entity, including its two (recipient + optional actor) user FKs.</summary>
@@ -1727,6 +1745,9 @@
         <member name="M:Cinora.Infrastructure.Tmdb.CachedTmdbClient.SearchAsync(Cinora.Domain.Enums.MediaType,System.String,System.Int32,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.CachedTmdbClient.SearchMultiAsync(System.String,System.Int32,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
         <member name="M:Cinora.Infrastructure.Tmdb.CachedTmdbClient.GetDetailsAsync(Cinora.Domain.Enums.MediaType,System.Int32,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
@@ -1740,6 +1761,9 @@
             <inheritdoc />
         </member>
         <member name="M:Cinora.Infrastructure.Tmdb.CachedTmdbClient.GetRegionalRailAsync(Cinora.Domain.Enums.MediaType,Cinora.Application.Features.Discovery.RailKind,System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.CachedTmdbClient.GetPersonCreditsAsync(System.Int32,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="T:Cinora.Infrastructure.Tmdb.CacheLog">
@@ -1788,6 +1812,23 @@
         <member name="T:Cinora.Infrastructure.Tmdb.Dtos.TmdbListItemDto">
             <summary>A single title as it appears in a TMDB list, trending, or search response.</summary>
         </member>
+        <member name="T:Cinora.Infrastructure.Tmdb.Dtos.TmdbPersonDto">
+            <summary>
+            A TMDB person response fetched with <c>append_to_response=combined_credits</c> (feature #9): the person's
+            name + profile image, plus their acting credits across movies and series. Internal to Infrastructure and
+            mapped to <see cref="T:Cinora.Application.Common.Tmdb.TmdbPersonCredits"/> by <see cref="T:Cinora.Infrastructure.Tmdb.TmdbMapper"/> (ADR 0006).
+            </summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Tmdb.Dtos.TmdbCombinedCreditsDto">
+            <summary>The appended <c>combined_credits</c> object of a TMDB person response.</summary>
+        </member>
+        <member name="T:Cinora.Infrastructure.Tmdb.Dtos.TmdbPersonCreditDto">
+            <summary>
+            A single acting credit within a person's <c>combined_credits.cast</c> array. Carries a per-item
+            <c>media_type</c> ("movie"/"tv") since a person's credits span both, plus both the movie
+            (<c>title</c>/<c>release_date</c>) and series (<c>name</c>/<c>first_air_date</c>) field names.
+            </summary>
+        </member>
         <member name="T:Cinora.Infrastructure.Tmdb.TmdbClient">
             <summary>
             The raw TMDB HTTP adapter behind <see cref="T:Cinora.Application.Common.Interfaces.ITmdbClient"/>: a typed <see cref="T:System.Net.Http.HttpClient"/> (base
@@ -1813,6 +1854,9 @@
         <member name="M:Cinora.Infrastructure.Tmdb.TmdbClient.SearchAsync(Cinora.Domain.Enums.MediaType,System.String,System.Int32,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbClient.SearchMultiAsync(System.String,System.Int32,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
         <member name="M:Cinora.Infrastructure.Tmdb.TmdbClient.GetDetailsAsync(Cinora.Domain.Enums.MediaType,System.Int32,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
@@ -1826,6 +1870,9 @@
             <inheritdoc />
         </member>
         <member name="M:Cinora.Infrastructure.Tmdb.TmdbClient.GetRegionalRailAsync(Cinora.Domain.Enums.MediaType,Cinora.Application.Features.Discovery.RailKind,System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbClient.GetPersonCreditsAsync(System.Int32,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="T:Cinora.Infrastructure.Tmdb.TmdbImageUrlBuilder">
@@ -1855,11 +1902,21 @@
         <member name="M:Cinora.Infrastructure.Tmdb.TmdbMapper.ToPage(Cinora.Infrastructure.Tmdb.Dtos.TmdbPagedDto{Cinora.Infrastructure.Tmdb.Dtos.TmdbListItemDto},Cinora.Domain.Enums.MediaType)">
             <summary>Maps a TMDB search page (envelope + results) to a paged read model.</summary>
         </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbMapper.ToMultiPage(Cinora.Infrastructure.Tmdb.Dtos.TmdbPagedDto{Cinora.Infrastructure.Tmdb.Dtos.TmdbListItemDto})">
+            <summary>
+            Maps a TMDB <c>search/multi</c> page to a paged read model, taking each result's media type from its own
+            <c>media_type</c> field (movies + series in one set) and DROPPING any non-title result (people, unknown) —
+            so the unified search returns only browsable titles.
+            </summary>
+        </member>
         <member name="M:Cinora.Infrastructure.Tmdb.TmdbMapper.ToDetails(Cinora.Infrastructure.Tmdb.Dtos.TmdbDetailsDto,Cinora.Domain.Enums.MediaType)">
             <summary>Maps a TMDB details response to the details read model, or <c>null</c> when absent.</summary>
         </member>
         <member name="M:Cinora.Infrastructure.Tmdb.TmdbMapper.ToGenres(Cinora.Infrastructure.Tmdb.Dtos.TmdbGenreListDto)">
             <summary>Maps a TMDB genre-list response to genre read models (empty when null/absent).</summary>
+        </member>
+        <member name="M:Cinora.Infrastructure.Tmdb.TmdbMapper.ToPersonCredits(Cinora.Infrastructure.Tmdb.Dtos.TmdbPersonDto)">
+            <summary>Maps a TMDB person response (with combined credits) to the read model, or <c>null</c> when absent.</summary>
         </member>
         <member name="T:System.Text.RegularExpressions.Generated.HrefPattern_0">
             <summary>Custom <see cref="T:System.Text.RegularExpressions.Regex"/>-derived type for the HrefPattern method.</summary>

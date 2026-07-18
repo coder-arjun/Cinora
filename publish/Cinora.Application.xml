@@ -358,6 +358,9 @@
         <member name="P:Cinora.Application.Common.Interfaces.IAppDbContext.ReviewLikes">
             <summary>The likes recorded against reviews.</summary>
         </member>
+        <member name="P:Cinora.Application.Common.Interfaces.IAppDbContext.MovieLikes">
+            <summary>The title-level "loves" (the poster love button).</summary>
+        </member>
         <member name="P:Cinora.Application.Common.Interfaces.IAppDbContext.Comments">
             <summary>The comments recorded against reviews.</summary>
         </member>
@@ -719,6 +722,17 @@
             <param name="cancellationToken">A token to cancel the operation.</param>
             <returns>One page of matching title summaries with paging metadata.</returns>
         </member>
+        <member name="M:Cinora.Application.Common.Interfaces.ITmdbClient.SearchMultiAsync(System.String,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Searches TMDB across ALL title kinds at once (movies AND series) via <c>search/multi</c> — the unified
+            search behind one box. Each returned summary carries its own <see cref="P:Cinora.Application.Common.Tmdb.TmdbTitleSummary.MediaType"/>;
+            non-title results (people) are dropped.
+            </summary>
+            <param name="query">The search text (the caller is expected to have validated it non-empty).</param>
+            <param name="page">The 1-based page to fetch.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+            <returns>One page of matching movie + series summaries with paging metadata.</returns>
+        </member>
         <member name="M:Cinora.Application.Common.Interfaces.ITmdbClient.GetDetailsAsync(Cinora.Domain.Enums.MediaType,System.Int32,System.Threading.CancellationToken)">
             <summary>Gets the full details of a single title, including its genres and a ranked cast summary.</summary>
             <param name="media">Whether the title is a movie or a series.</param>
@@ -767,6 +781,15 @@
             <param name="originalLanguage">The lower-case ISO-639-1 original language to filter to (never empty).</param>
             <param name="cancellationToken">A token to cancel the operation.</param>
             <returns>The discovered title summaries (first page); empty when TMDB returned nothing.</returns>
+        </member>
+        <member name="M:Cinora.Application.Common.Interfaces.ITmdbClient.GetPersonCreditsAsync(System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Gets a person (actor) and their acting filmography (TMDB <c>person/{id}</c> with
+            <c>combined_credits</c>) — the "click a cast member to see their titles" fan-out (feature #9).
+            </summary>
+            <param name="personId">The TMDB person identifier.</param>
+            <param name="cancellationToken">A token to cancel the operation.</param>
+            <returns>The person with their acting credits, or <c>null</c> when TMDB has no such person (404).</returns>
         </member>
         <member name="T:Cinora.Application.Common.Interfaces.ITmdbImageUrlBuilder">
             <summary>
@@ -1302,6 +1325,29 @@
         </member>
         <member name="P:Cinora.Application.Common.Tmdb.TmdbPage`1.Items">
             <summary>The items on this page.</summary>
+        </member>
+        <member name="T:Cinora.Application.Common.Tmdb.TmdbPersonCredits">
+            <summary>
+            An Application-owned read model for a TMDB person (an actor) and their acting filmography — the data
+            behind the "cast member → their titles" page (feature #9). Like every other <see cref="T:Cinora.Application.Common.Interfaces.ITmdbClient"/>
+            read model, TMDB's wire DTOs are mapped to this shape inside Infrastructure and never leak outward (ADR 0006).
+            <see cref="P:Cinora.Application.Common.Tmdb.TmdbPersonCredits.ProfilePath"/> carries the raw TMDB image path; the view builds the URL and picks a size.
+            </summary>
+        </member>
+        <member name="P:Cinora.Application.Common.Tmdb.TmdbPersonCredits.PersonId">
+            <summary>The TMDB person identifier.</summary>
+        </member>
+        <member name="P:Cinora.Application.Common.Tmdb.TmdbPersonCredits.Name">
+            <summary>The person's display name.</summary>
+        </member>
+        <member name="P:Cinora.Application.Common.Tmdb.TmdbPersonCredits.ProfilePath">
+            <summary>The raw TMDB profile image path, or <c>null</c> when none exists.</summary>
+        </member>
+        <member name="P:Cinora.Application.Common.Tmdb.TmdbPersonCredits.Titles">
+            <summary>
+            The person's acting credits as browsable title summaries (movies and series), unranked and
+            unfiltered; the ranking/filtering to the "most famous" titles is a query concern, not the port's.
+            </summary>
         </member>
         <member name="T:Cinora.Application.Common.Tmdb.TmdbTitleDetails">
             <summary>
@@ -2921,6 +2967,62 @@
         <member name="M:Cinora.Application.Features.Comments.GetReviewCommentsQueryHandler.Handle(Cinora.Application.Features.Comments.GetReviewCommentsQuery,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
+        <member name="T:Cinora.Application.Features.Discovery.GetMostLovedTitlesQuery">
+            <summary>
+            Returns the Cinora community's most-loved movies — the titles with the most poster "loves"
+            (<c>MovieLike</c> rows), highest first. This is the data source behind the Discover "Most Loved"
+            rail (feature #4: surface/sort titles by likes); the existing Top-Rated TMDB rails already cover
+            "by rating". Unlike the TMDB rails this reads Cinora's OWN data, so it lives over
+            <see cref="T:Cinora.Application.Common.Interfaces.IAppDbContext"/> rather than <c>ITmdbClient</c> and returns the shared <see cref="T:Cinora.Application.Features.Discovery.RailVm"/>
+            so the standard <c>_Rail</c> partial renders it unchanged.
+            </summary>
+            <remarks>
+            Scoped to movies (<see cref="F:Cinora.Domain.Enums.MediaType.Movie"/>) on purpose: the card love/watchlist batch maps the
+            controller resolves are keyed by TMDB id alone, and a movie and a series can share a TMDB id, so a
+            single-media rail keeps those maps collision-free. Two set-based reads (grouped counts, then the movie
+            rows) — no N+1. An app with no loves yet yields an empty rail, which <c>_Rail</c> renders as a quiet
+            empty state (never an error).
+            </remarks>
+            <param name="Take">How many titles to return (clamped 1..30).</param>
+        </member>
+        <member name="M:Cinora.Application.Features.Discovery.GetMostLovedTitlesQuery.#ctor(System.Int32)">
+            <summary>
+            Returns the Cinora community's most-loved movies — the titles with the most poster "loves"
+            (<c>MovieLike</c> rows), highest first. This is the data source behind the Discover "Most Loved"
+            rail (feature #4: surface/sort titles by likes); the existing Top-Rated TMDB rails already cover
+            "by rating". Unlike the TMDB rails this reads Cinora's OWN data, so it lives over
+            <see cref="T:Cinora.Application.Common.Interfaces.IAppDbContext"/> rather than <c>ITmdbClient</c> and returns the shared <see cref="T:Cinora.Application.Features.Discovery.RailVm"/>
+            so the standard <c>_Rail</c> partial renders it unchanged.
+            </summary>
+            <remarks>
+            Scoped to movies (<see cref="F:Cinora.Domain.Enums.MediaType.Movie"/>) on purpose: the card love/watchlist batch maps the
+            controller resolves are keyed by TMDB id alone, and a movie and a series can share a TMDB id, so a
+            single-media rail keeps those maps collision-free. Two set-based reads (grouped counts, then the movie
+            rows) — no N+1. An app with no loves yet yields an empty rail, which <c>_Rail</c> renders as a quiet
+            empty state (never an error).
+            </remarks>
+            <param name="Take">How many titles to return (clamped 1..30).</param>
+        </member>
+        <member name="P:Cinora.Application.Features.Discovery.GetMostLovedTitlesQuery.Take">
+            <summary>How many titles to return (clamped 1..30).</summary>
+        </member>
+        <member name="T:Cinora.Application.Features.Discovery.GetMostLovedTitlesQueryHandler">
+            <summary>
+            Handles <see cref="T:Cinora.Application.Features.Discovery.GetMostLovedTitlesQuery"/>: ranks movie ids by their love count, fetches those movie
+            rows, and projects them to <see cref="T:Cinora.Application.Features.Discovery.TitleCardVm"/> in rank order.
+            </summary>
+            <param name="db">The Application-owned persistence abstraction (read-only here).</param>
+        </member>
+        <member name="M:Cinora.Application.Features.Discovery.GetMostLovedTitlesQueryHandler.#ctor(Cinora.Application.Common.Interfaces.IAppDbContext)">
+            <summary>
+            Handles <see cref="T:Cinora.Application.Features.Discovery.GetMostLovedTitlesQuery"/>: ranks movie ids by their love count, fetches those movie
+            rows, and projects them to <see cref="T:Cinora.Application.Features.Discovery.TitleCardVm"/> in rank order.
+            </summary>
+            <param name="db">The Application-owned persistence abstraction (read-only here).</param>
+        </member>
+        <member name="M:Cinora.Application.Features.Discovery.GetMostLovedTitlesQueryHandler.Handle(Cinora.Application.Features.Discovery.GetMostLovedTitlesQuery,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
         <member name="T:Cinora.Application.Features.Discovery.GetMyDefaultLanguageQuery">
             <summary>
             Reads the CURRENT user's saved default movie-language preference (a lower-case ISO-639-1 code, or <c>null</c>
@@ -2948,6 +3050,70 @@
             <param name="currentUser">The server-resolved acting user (ADR 0009).</param>
         </member>
         <member name="M:Cinora.Application.Features.Discovery.GetMyDefaultLanguageQueryHandler.Handle(Cinora.Application.Features.Discovery.GetMyDefaultLanguageQuery,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Application.Features.Discovery.GetPersonTitlesQuery">
+            <summary>
+            Fetches a cast member (actor) and their most notable titles — the query behind the "click a cast member
+            to see their famous films" page (feature #9). Reads TMDB via <see cref="T:Cinora.Application.Common.Interfaces.ITmdbClient"/> only (CQRS-pure:
+            no DB, no <c>SaveChanges</c>), then ranks the person's acting credits to the ones fans would recognise.
+            </summary>
+            <param name="PersonId">The TMDB person identifier (from a cast member's card on the Details page).</param>
+        </member>
+        <member name="M:Cinora.Application.Features.Discovery.GetPersonTitlesQuery.#ctor(System.Int32)">
+            <summary>
+            Fetches a cast member (actor) and their most notable titles — the query behind the "click a cast member
+            to see their famous films" page (feature #9). Reads TMDB via <see cref="T:Cinora.Application.Common.Interfaces.ITmdbClient"/> only (CQRS-pure:
+            no DB, no <c>SaveChanges</c>), then ranks the person's acting credits to the ones fans would recognise.
+            </summary>
+            <param name="PersonId">The TMDB person identifier (from a cast member's card on the Details page).</param>
+        </member>
+        <member name="P:Cinora.Application.Features.Discovery.GetPersonTitlesQuery.PersonId">
+            <summary>The TMDB person identifier (from a cast member's card on the Details page).</summary>
+        </member>
+        <member name="T:Cinora.Application.Features.Discovery.PersonTitlesVm">
+            <summary>A cast member and their ranked, display-ready titles.</summary>
+            <param name="PersonId">The TMDB person id.</param>
+            <param name="Name">The person's display name.</param>
+            <param name="ProfilePath">The raw TMDB profile image path, or <c>null</c>.</param>
+            <param name="Titles">The person's most notable titles as poster cards, best first.</param>
+        </member>
+        <member name="M:Cinora.Application.Features.Discovery.PersonTitlesVm.#ctor(System.Int32,System.String,System.String,System.Collections.Generic.IReadOnlyList{Cinora.Application.Features.Discovery.TitleCardVm})">
+            <summary>A cast member and their ranked, display-ready titles.</summary>
+            <param name="PersonId">The TMDB person id.</param>
+            <param name="Name">The person's display name.</param>
+            <param name="ProfilePath">The raw TMDB profile image path, or <c>null</c>.</param>
+            <param name="Titles">The person's most notable titles as poster cards, best first.</param>
+        </member>
+        <member name="P:Cinora.Application.Features.Discovery.PersonTitlesVm.PersonId">
+            <summary>The TMDB person id.</summary>
+        </member>
+        <member name="P:Cinora.Application.Features.Discovery.PersonTitlesVm.Name">
+            <summary>The person's display name.</summary>
+        </member>
+        <member name="P:Cinora.Application.Features.Discovery.PersonTitlesVm.ProfilePath">
+            <summary>The raw TMDB profile image path, or <c>null</c>.</summary>
+        </member>
+        <member name="P:Cinora.Application.Features.Discovery.PersonTitlesVm.Titles">
+            <summary>The person's most notable titles as poster cards, best first.</summary>
+        </member>
+        <member name="T:Cinora.Application.Features.Discovery.GetPersonTitlesQueryHandler">
+            <summary>
+            Handles <see cref="T:Cinora.Application.Features.Discovery.GetPersonTitlesQuery"/>: fetches the person's combined acting credits, dedupes them,
+            keeps only titles with a poster, and ranks the "famous" ones (those with enough community votes) by rating
+            so a fan sees the star's recognisable films first — falling back to all credits when too few are famous.
+            </summary>
+            <param name="tmdb">The TMDB read port — the handler's ONLY dependency.</param>
+        </member>
+        <member name="M:Cinora.Application.Features.Discovery.GetPersonTitlesQueryHandler.#ctor(Cinora.Application.Common.Interfaces.ITmdbClient)">
+            <summary>
+            Handles <see cref="T:Cinora.Application.Features.Discovery.GetPersonTitlesQuery"/>: fetches the person's combined acting credits, dedupes them,
+            keeps only titles with a poster, and ranks the "famous" ones (those with enough community votes) by rating
+            so a fan sees the star's recognisable films first — falling back to all credits when too few are famous.
+            </summary>
+            <param name="tmdb">The TMDB read port — the handler's ONLY dependency.</param>
+        </member>
+        <member name="M:Cinora.Application.Features.Discovery.GetPersonTitlesQueryHandler.Handle(Cinora.Application.Features.Discovery.GetPersonTitlesQuery,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="T:Cinora.Application.Features.Discovery.GetTitleDetailsQuery">
@@ -3232,7 +3398,8 @@
             decorator (15-min TTL, trim+lower normalized key), so this handler stays cache-oblivious.
             </remarks>
             <param name="Query">The free-text search term (validated non-empty, 1–100 chars).</param>
-            <param name="Media">Whether to search movies or series (defaults to <see cref="F:Cinora.Domain.Enums.MediaType.Movie"/>).</param>
+            <param name="Media">Retained only to echo back into the load-more sentinel URL; the search itself now spans
+            ALL media (movies + series) via <c>search/multi</c>, so this no longer scopes the results.</param>
             <param name="Page">The 1-based TMDB result page to fetch (defaults to 1).</param>
         </member>
         <member name="M:Cinora.Application.Features.Discovery.SearchTitlesQuery.#ctor(System.String,Cinora.Domain.Enums.MediaType,System.Int32)">
@@ -3250,14 +3417,16 @@
             decorator (15-min TTL, trim+lower normalized key), so this handler stays cache-oblivious.
             </remarks>
             <param name="Query">The free-text search term (validated non-empty, 1–100 chars).</param>
-            <param name="Media">Whether to search movies or series (defaults to <see cref="F:Cinora.Domain.Enums.MediaType.Movie"/>).</param>
+            <param name="Media">Retained only to echo back into the load-more sentinel URL; the search itself now spans
+            ALL media (movies + series) via <c>search/multi</c>, so this no longer scopes the results.</param>
             <param name="Page">The 1-based TMDB result page to fetch (defaults to 1).</param>
         </member>
         <member name="P:Cinora.Application.Features.Discovery.SearchTitlesQuery.Query">
             <summary>The free-text search term (validated non-empty, 1–100 chars).</summary>
         </member>
         <member name="P:Cinora.Application.Features.Discovery.SearchTitlesQuery.Media">
-            <summary>Whether to search movies or series (defaults to <see cref="F:Cinora.Domain.Enums.MediaType.Movie"/>).</summary>
+            <summary>Retained only to echo back into the load-more sentinel URL; the search itself now spans
+            ALL media (movies + series) via <c>search/multi</c>, so this no longer scopes the results.</summary>
         </member>
         <member name="P:Cinora.Application.Features.Discovery.SearchTitlesQuery.Page">
             <summary>The 1-based TMDB result page to fetch (defaults to 1).</summary>
@@ -3294,17 +3463,17 @@
         </member>
         <member name="T:Cinora.Application.Features.Discovery.SearchTitlesQueryHandler">
             <summary>
-            Handles <see cref="T:Cinora.Application.Features.Discovery.SearchTitlesQuery"/> by calling <see cref="M:Cinora.Application.Common.Interfaces.ITmdbClient.SearchAsync(Cinora.Domain.Enums.MediaType,System.String,System.Int32,System.Threading.CancellationToken)"/> and projecting
-            each returned summary to a <see cref="T:Cinora.Application.Features.Discovery.TitleCardVm"/> via the shared <see cref="M:Cinora.Application.Features.Discovery.TitleCardVm.FromSummary(Cinora.Application.Common.Tmdb.TmdbTitleSummary)"/>
-            factory (the same projection the rail handler uses).
+            Handles <see cref="T:Cinora.Application.Features.Discovery.SearchTitlesQuery"/> by calling <see cref="M:Cinora.Application.Common.Interfaces.ITmdbClient.SearchMultiAsync(System.String,System.Int32,System.Threading.CancellationToken)"/> (movies AND
+            series in one set) and projecting each returned summary to a <see cref="T:Cinora.Application.Features.Discovery.TitleCardVm"/> via the shared
+            <see cref="M:Cinora.Application.Features.Discovery.TitleCardVm.FromSummary(Cinora.Application.Common.Tmdb.TmdbTitleSummary)"/> factory (the same projection the rail handler uses).
             </summary>
             <param name="tmdb">The TMDB read port — the handler's ONLY dependency (no DB, no mediator).</param>
         </member>
         <member name="M:Cinora.Application.Features.Discovery.SearchTitlesQueryHandler.#ctor(Cinora.Application.Common.Interfaces.ITmdbClient)">
             <summary>
-            Handles <see cref="T:Cinora.Application.Features.Discovery.SearchTitlesQuery"/> by calling <see cref="M:Cinora.Application.Common.Interfaces.ITmdbClient.SearchAsync(Cinora.Domain.Enums.MediaType,System.String,System.Int32,System.Threading.CancellationToken)"/> and projecting
-            each returned summary to a <see cref="T:Cinora.Application.Features.Discovery.TitleCardVm"/> via the shared <see cref="M:Cinora.Application.Features.Discovery.TitleCardVm.FromSummary(Cinora.Application.Common.Tmdb.TmdbTitleSummary)"/>
-            factory (the same projection the rail handler uses).
+            Handles <see cref="T:Cinora.Application.Features.Discovery.SearchTitlesQuery"/> by calling <see cref="M:Cinora.Application.Common.Interfaces.ITmdbClient.SearchMultiAsync(System.String,System.Int32,System.Threading.CancellationToken)"/> (movies AND
+            series in one set) and projecting each returned summary to a <see cref="T:Cinora.Application.Features.Discovery.TitleCardVm"/> via the shared
+            <see cref="M:Cinora.Application.Features.Discovery.TitleCardVm.FromSummary(Cinora.Application.Common.Tmdb.TmdbTitleSummary)"/> factory (the same projection the rail handler uses).
             </summary>
             <param name="tmdb">The TMDB read port — the handler's ONLY dependency (no DB, no mediator).</param>
         </member>
@@ -4151,6 +4320,117 @@
             <param name="logger">Records a Warning if the best-effort push fails (the request/notification still commit).</param>
         </member>
         <member name="M:Cinora.Application.Features.Friends.SendFriendRequestCommandHandler.Handle(Cinora.Application.Features.Friends.SendFriendRequestCommand,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Application.Features.MovieLikes.GetMovieLikeMapQuery">
+            <summary>
+            Resolves the love state (count + whether-I-loved) for a page of title cards in ONE batch — keyed by TMDB id, so
+            each poster renders its love button without an N+1 (mirrors the watchlist status map, ADR 0014). Titles not yet
+            first-touch-persisted simply have no <c>Movie</c> row and are absent from the map (the card renders count 0 /
+            not-loved). The viewer is server-resolved; callers only invoke it when authenticated.
+            </summary>
+            <param name="TmdbIds">The TMDB ids of the cards on the page.</param>
+            <param name="Media">The media type shared by the page's cards.</param>
+        </member>
+        <member name="M:Cinora.Application.Features.MovieLikes.GetMovieLikeMapQuery.#ctor(System.Collections.Generic.IReadOnlyList{System.Int32},Cinora.Domain.Enums.MediaType)">
+            <summary>
+            Resolves the love state (count + whether-I-loved) for a page of title cards in ONE batch — keyed by TMDB id, so
+            each poster renders its love button without an N+1 (mirrors the watchlist status map, ADR 0014). Titles not yet
+            first-touch-persisted simply have no <c>Movie</c> row and are absent from the map (the card renders count 0 /
+            not-loved). The viewer is server-resolved; callers only invoke it when authenticated.
+            </summary>
+            <param name="TmdbIds">The TMDB ids of the cards on the page.</param>
+            <param name="Media">The media type shared by the page's cards.</param>
+        </member>
+        <member name="P:Cinora.Application.Features.MovieLikes.GetMovieLikeMapQuery.TmdbIds">
+            <summary>The TMDB ids of the cards on the page.</summary>
+        </member>
+        <member name="P:Cinora.Application.Features.MovieLikes.GetMovieLikeMapQuery.Media">
+            <summary>The media type shared by the page's cards.</summary>
+        </member>
+        <member name="T:Cinora.Application.Features.MovieLikes.GetMovieLikeMapQueryHandler">
+            <summary>Handles <see cref="T:Cinora.Application.Features.MovieLikes.GetMovieLikeMapQuery"/> with three set-based reads (no N+1). Read-only (CQRS-pure).</summary>
+            <param name="db">The persistence context.</param>
+            <param name="currentUser">The server-resolved viewer (ADR 0009).</param>
+        </member>
+        <member name="M:Cinora.Application.Features.MovieLikes.GetMovieLikeMapQueryHandler.#ctor(Cinora.Application.Common.Interfaces.IAppDbContext,Cinora.Application.Common.Interfaces.ICurrentUser)">
+            <summary>Handles <see cref="T:Cinora.Application.Features.MovieLikes.GetMovieLikeMapQuery"/> with three set-based reads (no N+1). Read-only (CQRS-pure).</summary>
+            <param name="db">The persistence context.</param>
+            <param name="currentUser">The server-resolved viewer (ADR 0009).</param>
+        </member>
+        <member name="M:Cinora.Application.Features.MovieLikes.GetMovieLikeMapQueryHandler.Handle(Cinora.Application.Features.MovieLikes.GetMovieLikeMapQuery,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Application.Features.MovieLikes.GetMovieLikeQuery">
+            <summary>Reads the love state of a single title (count + whether the current user loved it) — for the Details page.</summary>
+            <param name="MovieId">The internal id of the title.</param>
+        </member>
+        <member name="M:Cinora.Application.Features.MovieLikes.GetMovieLikeQuery.#ctor(System.Guid)">
+            <summary>Reads the love state of a single title (count + whether the current user loved it) — for the Details page.</summary>
+            <param name="MovieId">The internal id of the title.</param>
+        </member>
+        <member name="P:Cinora.Application.Features.MovieLikes.GetMovieLikeQuery.MovieId">
+            <summary>The internal id of the title.</summary>
+        </member>
+        <member name="T:Cinora.Application.Features.MovieLikes.GetMovieLikeQueryHandler">
+            <summary>Handles <see cref="T:Cinora.Application.Features.MovieLikes.GetMovieLikeQuery"/>. Read-only (CQRS-pure).</summary>
+            <param name="db">The persistence context.</param>
+            <param name="currentUser">The server-resolved viewer (ADR 0009).</param>
+        </member>
+        <member name="M:Cinora.Application.Features.MovieLikes.GetMovieLikeQueryHandler.#ctor(Cinora.Application.Common.Interfaces.IAppDbContext,Cinora.Application.Common.Interfaces.ICurrentUser)">
+            <summary>Handles <see cref="T:Cinora.Application.Features.MovieLikes.GetMovieLikeQuery"/>. Read-only (CQRS-pure).</summary>
+            <param name="db">The persistence context.</param>
+            <param name="currentUser">The server-resolved viewer (ADR 0009).</param>
+        </member>
+        <member name="M:Cinora.Application.Features.MovieLikes.GetMovieLikeQueryHandler.Handle(Cinora.Application.Features.MovieLikes.GetMovieLikeQuery,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:Cinora.Application.Features.MovieLikes.MovieLikeVm">
+            <summary>The love state of a title for the current viewer: whether they have loved it, and the total count.</summary>
+            <param name="Liked">Whether the current user has loved this title.</param>
+            <param name="Count">The total number of users who have loved this title.</param>
+        </member>
+        <member name="M:Cinora.Application.Features.MovieLikes.MovieLikeVm.#ctor(System.Boolean,System.Int32)">
+            <summary>The love state of a title for the current viewer: whether they have loved it, and the total count.</summary>
+            <param name="Liked">Whether the current user has loved this title.</param>
+            <param name="Count">The total number of users who have loved this title.</param>
+        </member>
+        <member name="P:Cinora.Application.Features.MovieLikes.MovieLikeVm.Liked">
+            <summary>Whether the current user has loved this title.</summary>
+        </member>
+        <member name="P:Cinora.Application.Features.MovieLikes.MovieLikeVm.Count">
+            <summary>The total number of users who have loved this title.</summary>
+        </member>
+        <member name="T:Cinora.Application.Features.MovieLikes.ToggleMovieLikeCommand">
+            <summary>
+            Toggles the current user's "love" for a title (the poster love button). Adds the like if absent, removes it if
+            present, and returns the new state + total count. The actor is server-resolved (ADR 0009); the caller supplies
+            the internal <c>MovieId</c> (resolved via the read-then-EnsureTitleCached orchestration, ADR 0007/0008).
+            </summary>
+            <param name="MovieId">The internal id of the loved title (NOT the TMDB id).</param>
+        </member>
+        <member name="M:Cinora.Application.Features.MovieLikes.ToggleMovieLikeCommand.#ctor(System.Guid)">
+            <summary>
+            Toggles the current user's "love" for a title (the poster love button). Adds the like if absent, removes it if
+            present, and returns the new state + total count. The actor is server-resolved (ADR 0009); the caller supplies
+            the internal <c>MovieId</c> (resolved via the read-then-EnsureTitleCached orchestration, ADR 0007/0008).
+            </summary>
+            <param name="MovieId">The internal id of the loved title (NOT the TMDB id).</param>
+        </member>
+        <member name="P:Cinora.Application.Features.MovieLikes.ToggleMovieLikeCommand.MovieId">
+            <summary>The internal id of the loved title (NOT the TMDB id).</summary>
+        </member>
+        <member name="T:Cinora.Application.Features.MovieLikes.ToggleMovieLikeCommandHandler">
+            <summary>Handles <see cref="T:Cinora.Application.Features.MovieLikes.ToggleMovieLikeCommand"/>.</summary>
+            <param name="db">The persistence context.</param>
+            <param name="currentUser">The server-resolved acting user (ADR 0009).</param>
+        </member>
+        <member name="M:Cinora.Application.Features.MovieLikes.ToggleMovieLikeCommandHandler.#ctor(Cinora.Application.Common.Interfaces.IAppDbContext,Cinora.Application.Common.Interfaces.ICurrentUser)">
+            <summary>Handles <see cref="T:Cinora.Application.Features.MovieLikes.ToggleMovieLikeCommand"/>.</summary>
+            <param name="db">The persistence context.</param>
+            <param name="currentUser">The server-resolved acting user (ADR 0009).</param>
+        </member>
+        <member name="M:Cinora.Application.Features.MovieLikes.ToggleMovieLikeCommandHandler.Handle(Cinora.Application.Features.MovieLikes.ToggleMovieLikeCommand,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="T:Cinora.Application.Features.Notifications.GetNotificationSettingsQuery">

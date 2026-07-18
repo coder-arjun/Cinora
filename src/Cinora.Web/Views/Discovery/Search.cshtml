@@ -18,9 +18,9 @@
         <p class="inline-flex items-center gap-2 rounded-pill border border-white/10 bg-surface-1/60 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-accent backdrop-blur-glass">
             Search
         </p>
-        <h1 class="mt-5 font-display text-display font-semibold text-ink">Find a film</h1>
+        <h1 class="mt-5 font-display text-display font-semibold text-ink">Find a title</h1>
         <p class="mt-4 text-lg text-ink-muted">
-            Search thousands of titles.
+            Search thousands of movies &amp; series.
         </p>
     </header>
 
@@ -30,7 +30,7 @@
         <form method="get" action="/discover/search" role="search" class="max-w-2xl">
             @* Movie-only in Phase 2, but echo the media so a no-JS submit preserves the deep-linked scope. *@
             <input type="hidden" name="media" value="@Model.Media" />
-            <label for="search-q" class="sr-only">Search movies</label>
+            <label for="search-q" class="sr-only">Search movies and series</label>
             <div class="relative">
                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center ps-4 text-ink-subtle" aria-hidden="true">
                     <svg viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5">
@@ -39,7 +39,7 @@
                 </span>
 
                 <input id="search-q" name="q" type="search" autocomplete="off" spellcheck="false"
-                       inputmode="search" placeholder="Search movies…" value="@Model.Query"
+                       inputmode="search" placeholder="Search movies &amp; series…" value="@Model.Query"
                        x-model="query" x-on:input.debounce.300ms="onInput"
                        class="input ps-11 pe-11" />
 
@@ -68,7 +68,7 @@
              tabindex="-1" x-bind:aria-busy="loading" class="mt-8 sm:mt-10">
             @if (Model.Results is not null)
             {
-                <partial name="_SearchResults" model="new SearchResultsViewModel(Model.Results, Model.Statuses, Model.IsAuthenticated)" />
+                <partial name="_SearchResults" model="new SearchResultsViewModel(Model.Results, Model.Statuses, Model.Likes, Model.IsAuthenticated)" />
             }
             else
             {

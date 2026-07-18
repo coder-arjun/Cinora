@@ -515,6 +515,26 @@ namespace Cinora.Infrastructure.Migrations
                     b.ToTable("MovieGenres");
                 });
 
+            modelBuilder.Entity("Cinora.Domain.Entities.MovieLike", b =>
+                {
+                    b.Property<Guid>("MovieId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("LikedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("MovieId", "UserId");
+
+                    b.HasIndex("MovieId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("MovieLikes");
+                });
+
             modelBuilder.Entity("Cinora.Domain.Entities.Notification", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1029,6 +1049,21 @@ namespace Cinora.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("MovieId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Cinora.Domain.Entities.MovieLike", b =>
+                {
+                    b.HasOne("Cinora.Domain.Entities.Movie", null)
+                        .WithMany()
+                        .HasForeignKey("MovieId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Cinora.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

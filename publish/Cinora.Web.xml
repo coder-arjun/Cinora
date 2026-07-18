@@ -500,6 +500,17 @@
             <returns>The <c>_Rail</c> partial with the cards, or <c>400</c> when <paramref name="kind"/> or
             <paramref name="media"/> is not a valid, defined enum value.</returns>
         </member>
+        <member name="M:Cinora.Web.Controllers.DiscoveryController.MostLovedRail(System.Threading.CancellationToken)">
+            <summary>
+            Returns the "Most Loved" rail — the Cinora community's most-loved movies (by poster-love count) — as the
+            <c>_Rail</c> partial for the shell's lazy-load (feature #4). Reads Cinora's own data via
+            <see cref="T:Cinora.Application.Features.Discovery.GetMostLovedTitlesQuery"/> (not TMDB), then composes the same per-user watchlist + love maps as
+            the TMDB rails so each card renders its controls without an N+1. An app with no loves yet yields the quiet
+            empty rail, never an error.
+            </summary>
+            <param name="cancellationToken">Bound from <c>HttpContext.RequestAborted</c>; threaded to the handlers.</param>
+            <returns>The <c>_Rail</c> partial with the most-loved movie cards (possibly empty).</returns>
+        </member>
         <member name="M:Cinora.Web.Controllers.DiscoveryController.Search(System.String,Cinora.Domain.Enums.MediaType,System.Int32,System.Threading.CancellationToken)">
             <summary>
             The full Search page (<c>GET /discover/search</c>): the debounced input plus a results region. When
@@ -555,6 +566,29 @@
             <returns>The <c>_ReviewList</c> partial (first page) or <c>_ReviewListPage</c> append fragment (a cursor
             request); <c>404</c> when the media segment is unknown or the id is non-positive.</returns>
         </member>
+        <member name="M:Cinora.Web.Controllers.DiscoveryController.Person(System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            A cast member's page (<c>GET /discover/person/{personId}</c>): the actor and a grid of their most
+            notable titles, best-rated first (feature #9). Reached from a cast card on the Details page. A person
+            TMDB doesn't know (404) or a post-resilience TMDB failure both render a 404 — this is a whole page (not
+            a lazy partial region), so there is no retry-partial contract to honour.
+            </summary>
+            <param name="personId">The TMDB person identifier.</param>
+            <param name="cancellationToken">Bound from <c>HttpContext.RequestAborted</c>; threaded to the handler.</param>
+            <returns>The Person view, or <c>404</c> when the id is non-positive / unknown / the fetch failed.</returns>
+        </member>
+        <member name="M:Cinora.Web.Controllers.DiscoveryController.ToggleLove(System.String,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Toggles the current user's "love" for a title (<c>POST /discover/title/{media}/{tmdbId}/like</c>) and
+            returns the re-rendered <c>_LoveButton</c>. Read-then-EnsureTitleCached-then-write (ADR 0007/0008): the
+            idempotent cache-warm resolves the internal <c>MovieId</c> the like hangs off. Rate-limited + anti-forgery
+            (the HTMX post carries the token).
+            </summary>
+            <param name="media">The lowercase media segment (e.g. <c>movie</c>).</param>
+            <param name="tmdbId">The TMDB identifier of the title.</param>
+            <param name="cancellationToken">Bound from <c>HttpContext.RequestAborted</c>.</param>
+            <returns>The <c>_LoveButton</c> partial in its new state; <c>404</c> for a bad media/id or an uncacheable title.</returns>
+        </member>
         <member name="M:Cinora.Web.Controllers.DiscoveryController.LogReviewsLoadFailed(Microsoft.Extensions.Logging.ILogger,System.Exception,Cinora.Domain.Enums.MediaType,System.Int32)">
             <summary>
             Logs "Loading reviews for {Media} TMDB id {TmdbId} failed; serving the retry partial (HTTP 200)." at "Warning" level.
@@ -573,6 +607,11 @@
         <member name="M:Cinora.Web.Controllers.DiscoveryController.LogTitlePersistFailed(Microsoft.Extensions.Logging.ILogger,System.Exception,Cinora.Domain.Enums.MediaType,System.Int32)">
             <summary>
             Logs "First-touch catalog persistence failed for {Media} TMDB id {TmdbId}; the Details page still rendered." at "Warning" level.
+            </summary>
+        </member>
+        <member name="M:Cinora.Web.Controllers.DiscoveryController.LogPersonLoadFailed(Microsoft.Extensions.Logging.ILogger,System.Exception,System.Int32)">
+            <summary>
+            Logs "Loading the person page for TMDB person id {PersonId} failed; serving a 404." at "Warning" level.
             </summary>
         </member>
         <member name="T:Cinora.Web.Controllers.FriendsController">
@@ -2448,11 +2487,13 @@
             <param name="Query">The trimmed query echoed into the input (empty when none was supplied).</param>
             <param name="Media">The media type to search (defaults to Movie; drives the region's <c>data-media</c>).</param>
             <param name="Results">The server-rendered page-1 results, or <c>null</c> to show the idle prompt.</param>
-            <param name="Statuses">The current user's watchlist statuses for the inline page-1 titles (§5.3); empty for
-            anonymous viewers or when there are no results.</param>
+            <param name="Statuses">The current user's watchlist statuses for the inline page-1 titles, keyed by
+            (TMDB id, media) since unified search mixes movies + series; empty for anonymous or no results.</param>
+            <param name="Likes">The love state (count + whether-I-loved) for the inline page-1 titles, keyed by
+            (TMDB id, media); empty for anonymous.</param>
             <param name="IsAuthenticated">Whether the viewer is signed in (drives the cards' watchlist control).</param>
         </member>
-        <member name="M:Cinora.Web.ViewModels.Discovery.SearchPageViewModel.#ctor(System.String,Cinora.Domain.Enums.MediaType,Cinora.Application.Features.Discovery.SearchResultsVm,System.Collections.Generic.IReadOnlyDictionary{System.Int32,Cinora.Domain.Enums.WatchlistStatus},System.Boolean)">
+        <member name="M:Cinora.Web.ViewModels.Discovery.SearchPageViewModel.#ctor(System.String,Cinora.Domain.Enums.MediaType,Cinora.Application.Features.Discovery.SearchResultsVm,System.Collections.Generic.IReadOnlyDictionary{System.ValueTuple{System.Int32,Cinora.Domain.Enums.MediaType},Cinora.Domain.Enums.WatchlistStatus},System.Collections.Generic.IReadOnlyDictionary{System.ValueTuple{System.Int32,Cinora.Domain.Enums.MediaType},Cinora.Application.Features.MovieLikes.MovieLikeVm},System.Boolean)">
             <summary>
             The presentation model for the full Search page (<c>GET /discover/search</c>, Milestone 2.4). It carries
             the echoed query + media (so the input and the Alpine/HTMX region can seed themselves for deep-links and
@@ -2464,8 +2505,10 @@
             <param name="Query">The trimmed query echoed into the input (empty when none was supplied).</param>
             <param name="Media">The media type to search (defaults to Movie; drives the region's <c>data-media</c>).</param>
             <param name="Results">The server-rendered page-1 results, or <c>null</c> to show the idle prompt.</param>
-            <param name="Statuses">The current user's watchlist statuses for the inline page-1 titles (§5.3); empty for
-            anonymous viewers or when there are no results.</param>
+            <param name="Statuses">The current user's watchlist statuses for the inline page-1 titles, keyed by
+            (TMDB id, media) since unified search mixes movies + series; empty for anonymous or no results.</param>
+            <param name="Likes">The love state (count + whether-I-loved) for the inline page-1 titles, keyed by
+            (TMDB id, media); empty for anonymous.</param>
             <param name="IsAuthenticated">Whether the viewer is signed in (drives the cards' watchlist control).</param>
         </member>
         <member name="P:Cinora.Web.ViewModels.Discovery.SearchPageViewModel.Query">
@@ -2478,8 +2521,12 @@
             <summary>The server-rendered page-1 results, or <c>null</c> to show the idle prompt.</summary>
         </member>
         <member name="P:Cinora.Web.ViewModels.Discovery.SearchPageViewModel.Statuses">
-            <summary>The current user's watchlist statuses for the inline page-1 titles (§5.3); empty for
-            anonymous viewers or when there are no results.</summary>
+            <summary>The current user's watchlist statuses for the inline page-1 titles, keyed by
+            (TMDB id, media) since unified search mixes movies + series; empty for anonymous or no results.</summary>
+        </member>
+        <member name="P:Cinora.Web.ViewModels.Discovery.SearchPageViewModel.Likes">
+            <summary>The love state (count + whether-I-loved) for the inline page-1 titles, keyed by
+            (TMDB id, media); empty for anonymous.</summary>
         </member>
         <member name="P:Cinora.Web.ViewModels.Discovery.SearchPageViewModel.IsAuthenticated">
             <summary>Whether the viewer is signed in (drives the cards' watchlist control).</summary>
@@ -2508,64 +2555,124 @@
         <member name="T:Cinora.Web.ViewModels.Discovery.RailViewModel">
             <summary>
             Composes a CQRS-pure <see cref="T:Cinora.Application.Features.Discovery.RailVm"/> (from the <c>ITmdbClient</c>-only rail query) with the current
-            user's watchlist statuses for the rail's titles (§5.3, ADR 0014). The controller resolves the batch
-            <c>GetWatchlistStatusMapQuery</c> ONCE for authenticated users, then hands the rail + map to the
-            <c>_Rail</c> partial so each card can render its <c>_WatchlistControl</c> without an N+1. Anonymous requests
-            get an empty map and the rail partial stays cacheable/pure.
+            user's watchlist statuses AND love state for the rail's titles (§5.3, ADR 0014). The controller resolves the
+            batch maps ONCE for authenticated users, then hands the rail + maps to the <c>_Rail</c> partial so each card
+            can render its <c>_WatchlistControl</c> + <c>_LoveButton</c> without an N+1. Anonymous requests get empty maps
+            and the rail partial stays cacheable/pure.
             </summary>
             <param name="Rail">The pure rail read model.</param>
-            <param name="Statuses">TMDB id → the current user's status for that title (absent = not in list).</param>
-            <param name="IsAuthenticated">Whether the viewer is signed in (drives write control vs sign-in affordance).</param>
+            <param name="Statuses">TMDB id → the current user's watchlist status for that title (absent = not in list).</param>
+            <param name="Likes">TMDB id → the title's love state (count + whether I loved it); absent = count 0, not loved.</param>
+            <param name="IsAuthenticated">Whether the viewer is signed in (drives write controls vs sign-in affordance).</param>
         </member>
-        <member name="M:Cinora.Web.ViewModels.Discovery.RailViewModel.#ctor(Cinora.Application.Features.Discovery.RailVm,System.Collections.Generic.IReadOnlyDictionary{System.Int32,Cinora.Domain.Enums.WatchlistStatus},System.Boolean)">
+        <member name="M:Cinora.Web.ViewModels.Discovery.RailViewModel.#ctor(Cinora.Application.Features.Discovery.RailVm,System.Collections.Generic.IReadOnlyDictionary{System.Int32,Cinora.Domain.Enums.WatchlistStatus},System.Collections.Generic.IReadOnlyDictionary{System.Int32,Cinora.Application.Features.MovieLikes.MovieLikeVm},System.Boolean)">
             <summary>
             Composes a CQRS-pure <see cref="T:Cinora.Application.Features.Discovery.RailVm"/> (from the <c>ITmdbClient</c>-only rail query) with the current
-            user's watchlist statuses for the rail's titles (§5.3, ADR 0014). The controller resolves the batch
-            <c>GetWatchlistStatusMapQuery</c> ONCE for authenticated users, then hands the rail + map to the
-            <c>_Rail</c> partial so each card can render its <c>_WatchlistControl</c> without an N+1. Anonymous requests
-            get an empty map and the rail partial stays cacheable/pure.
+            user's watchlist statuses AND love state for the rail's titles (§5.3, ADR 0014). The controller resolves the
+            batch maps ONCE for authenticated users, then hands the rail + maps to the <c>_Rail</c> partial so each card
+            can render its <c>_WatchlistControl</c> + <c>_LoveButton</c> without an N+1. Anonymous requests get empty maps
+            and the rail partial stays cacheable/pure.
             </summary>
             <param name="Rail">The pure rail read model.</param>
-            <param name="Statuses">TMDB id → the current user's status for that title (absent = not in list).</param>
-            <param name="IsAuthenticated">Whether the viewer is signed in (drives write control vs sign-in affordance).</param>
+            <param name="Statuses">TMDB id → the current user's watchlist status for that title (absent = not in list).</param>
+            <param name="Likes">TMDB id → the title's love state (count + whether I loved it); absent = count 0, not loved.</param>
+            <param name="IsAuthenticated">Whether the viewer is signed in (drives write controls vs sign-in affordance).</param>
         </member>
         <member name="P:Cinora.Web.ViewModels.Discovery.RailViewModel.Rail">
             <summary>The pure rail read model.</summary>
         </member>
         <member name="P:Cinora.Web.ViewModels.Discovery.RailViewModel.Statuses">
-            <summary>TMDB id → the current user's status for that title (absent = not in list).</summary>
+            <summary>TMDB id → the current user's watchlist status for that title (absent = not in list).</summary>
+        </member>
+        <member name="P:Cinora.Web.ViewModels.Discovery.RailViewModel.Likes">
+            <summary>TMDB id → the title's love state (count + whether I loved it); absent = count 0, not loved.</summary>
         </member>
         <member name="P:Cinora.Web.ViewModels.Discovery.RailViewModel.IsAuthenticated">
-            <summary>Whether the viewer is signed in (drives write control vs sign-in affordance).</summary>
+            <summary>Whether the viewer is signed in (drives write controls vs sign-in affordance).</summary>
         </member>
         <member name="T:Cinora.Web.ViewModels.Discovery.SearchResultsViewModel">
             <summary>
-            The search equivalent of <see cref="T:Cinora.Web.ViewModels.Discovery.RailViewModel"/>: a CQRS-pure <see cref="T:Cinora.Application.Features.Discovery.SearchResultsVm"/> composed
-            with the current user's watchlist statuses for the page's titles (resolved once per page via the batch
-            <c>GetWatchlistStatusMapQuery</c>, authenticated only — §5.3).
+            The search equivalent of <see cref="T:Cinora.Web.ViewModels.Discovery.RailViewModel"/>: a CQRS-pure <see cref="T:Cinora.Application.Features.Discovery.SearchResultsVm"/> composed with
+            the current user's watchlist statuses and love state for the page's titles (resolved once per page, authed).
             </summary>
+            <remarks>
+            Unlike the single-media rail maps, the maps here are keyed by <c>(TMDB id, media type)</c> because unified
+            search mixes movies and series in one page — and a movie id and a series id can be the same integer, so a
+            plain int key could collide. The view looks up with <c>(card.TmdbId, card.MediaType)</c>.
+            </remarks>
             <param name="Results">The pure search-results read model (one page of cards).</param>
-            <param name="Statuses">TMDB id → the current user's status for that title (absent = not in list).</param>
-            <param name="IsAuthenticated">Whether the viewer is signed in (drives write control vs sign-in affordance).</param>
+            <param name="Statuses">(TMDB id, media) → the current user's watchlist status (absent = not in list).</param>
+            <param name="Likes">(TMDB id, media) → the title's love state (count + whether I loved it); absent = 0/not loved.</param>
+            <param name="IsAuthenticated">Whether the viewer is signed in (drives write controls vs sign-in affordance).</param>
         </member>
-        <member name="M:Cinora.Web.ViewModels.Discovery.SearchResultsViewModel.#ctor(Cinora.Application.Features.Discovery.SearchResultsVm,System.Collections.Generic.IReadOnlyDictionary{System.Int32,Cinora.Domain.Enums.WatchlistStatus},System.Boolean)">
+        <member name="M:Cinora.Web.ViewModels.Discovery.SearchResultsViewModel.#ctor(Cinora.Application.Features.Discovery.SearchResultsVm,System.Collections.Generic.IReadOnlyDictionary{System.ValueTuple{System.Int32,Cinora.Domain.Enums.MediaType},Cinora.Domain.Enums.WatchlistStatus},System.Collections.Generic.IReadOnlyDictionary{System.ValueTuple{System.Int32,Cinora.Domain.Enums.MediaType},Cinora.Application.Features.MovieLikes.MovieLikeVm},System.Boolean)">
             <summary>
-            The search equivalent of <see cref="T:Cinora.Web.ViewModels.Discovery.RailViewModel"/>: a CQRS-pure <see cref="T:Cinora.Application.Features.Discovery.SearchResultsVm"/> composed
-            with the current user's watchlist statuses for the page's titles (resolved once per page via the batch
-            <c>GetWatchlistStatusMapQuery</c>, authenticated only — §5.3).
+            The search equivalent of <see cref="T:Cinora.Web.ViewModels.Discovery.RailViewModel"/>: a CQRS-pure <see cref="T:Cinora.Application.Features.Discovery.SearchResultsVm"/> composed with
+            the current user's watchlist statuses and love state for the page's titles (resolved once per page, authed).
             </summary>
+            <remarks>
+            Unlike the single-media rail maps, the maps here are keyed by <c>(TMDB id, media type)</c> because unified
+            search mixes movies and series in one page — and a movie id and a series id can be the same integer, so a
+            plain int key could collide. The view looks up with <c>(card.TmdbId, card.MediaType)</c>.
+            </remarks>
             <param name="Results">The pure search-results read model (one page of cards).</param>
-            <param name="Statuses">TMDB id → the current user's status for that title (absent = not in list).</param>
-            <param name="IsAuthenticated">Whether the viewer is signed in (drives write control vs sign-in affordance).</param>
+            <param name="Statuses">(TMDB id, media) → the current user's watchlist status (absent = not in list).</param>
+            <param name="Likes">(TMDB id, media) → the title's love state (count + whether I loved it); absent = 0/not loved.</param>
+            <param name="IsAuthenticated">Whether the viewer is signed in (drives write controls vs sign-in affordance).</param>
         </member>
         <member name="P:Cinora.Web.ViewModels.Discovery.SearchResultsViewModel.Results">
             <summary>The pure search-results read model (one page of cards).</summary>
         </member>
         <member name="P:Cinora.Web.ViewModels.Discovery.SearchResultsViewModel.Statuses">
-            <summary>TMDB id → the current user's status for that title (absent = not in list).</summary>
+            <summary>(TMDB id, media) → the current user's watchlist status (absent = not in list).</summary>
+        </member>
+        <member name="P:Cinora.Web.ViewModels.Discovery.SearchResultsViewModel.Likes">
+            <summary>(TMDB id, media) → the title's love state (count + whether I loved it); absent = 0/not loved.</summary>
         </member>
         <member name="P:Cinora.Web.ViewModels.Discovery.SearchResultsViewModel.IsAuthenticated">
-            <summary>Whether the viewer is signed in (drives write control vs sign-in affordance).</summary>
+            <summary>Whether the viewer is signed in (drives write controls vs sign-in affordance).</summary>
+        </member>
+        <member name="T:Cinora.Web.ViewModels.Discovery.LoveButtonVm">
+            <summary>
+            The model for the shared <c>_LoveButton</c> partial: a title's love button + count for one surface (poster card
+            or Details). It toggles via <c>POST /discover/title/{media}/{tmdbId}/like</c> and swaps itself.
+            </summary>
+            <param name="TmdbId">The title's TMDB id.</param>
+            <param name="Media">The title's media type.</param>
+            <param name="Liked">Whether the current user has loved this title.</param>
+            <param name="Count">The total number of loves.</param>
+            <param name="IsAuthenticated">Whether the viewer is signed in (an anonymous viewer sees a read-only count).</param>
+            <param name="OnDetails">Whether this renders on the Details page (larger) vs a poster overlay (compact).</param>
+        </member>
+        <member name="M:Cinora.Web.ViewModels.Discovery.LoveButtonVm.#ctor(System.Int32,Cinora.Domain.Enums.MediaType,System.Boolean,System.Int32,System.Boolean,System.Boolean)">
+            <summary>
+            The model for the shared <c>_LoveButton</c> partial: a title's love button + count for one surface (poster card
+            or Details). It toggles via <c>POST /discover/title/{media}/{tmdbId}/like</c> and swaps itself.
+            </summary>
+            <param name="TmdbId">The title's TMDB id.</param>
+            <param name="Media">The title's media type.</param>
+            <param name="Liked">Whether the current user has loved this title.</param>
+            <param name="Count">The total number of loves.</param>
+            <param name="IsAuthenticated">Whether the viewer is signed in (an anonymous viewer sees a read-only count).</param>
+            <param name="OnDetails">Whether this renders on the Details page (larger) vs a poster overlay (compact).</param>
+        </member>
+        <member name="P:Cinora.Web.ViewModels.Discovery.LoveButtonVm.TmdbId">
+            <summary>The title's TMDB id.</summary>
+        </member>
+        <member name="P:Cinora.Web.ViewModels.Discovery.LoveButtonVm.Media">
+            <summary>The title's media type.</summary>
+        </member>
+        <member name="P:Cinora.Web.ViewModels.Discovery.LoveButtonVm.Liked">
+            <summary>Whether the current user has loved this title.</summary>
+        </member>
+        <member name="P:Cinora.Web.ViewModels.Discovery.LoveButtonVm.Count">
+            <summary>The total number of loves.</summary>
+        </member>
+        <member name="P:Cinora.Web.ViewModels.Discovery.LoveButtonVm.IsAuthenticated">
+            <summary>Whether the viewer is signed in (an anonymous viewer sees a read-only count).</summary>
+        </member>
+        <member name="P:Cinora.Web.ViewModels.Discovery.LoveButtonVm.OnDetails">
+            <summary>Whether this renders on the Details page (larger) vs a poster overlay (compact).</summary>
         </member>
         <member name="T:Cinora.Web.ViewModels.Feed.FeedErrorVm">
             <summary>

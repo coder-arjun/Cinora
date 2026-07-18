@@ -442,6 +442,38 @@ async function connectRealtime(conversationId: string, myId: string, list: HTMLE
   }
 }
 
+// Feature #2 — a small search box over the conversation list: filter the rows (DMs show a friend's name,
+// groups a group name) by name as the user types. Pure client-side over the already-rendered rows — no
+// endpoint, no network. CSP-safe (wired via addEventListener; visibility toggled with a class, never innerHTML).
+function wireConversationSearch(): void {
+  const input = document.getElementById("chat-search");
+  const listBox = document.getElementById("conversation-list");
+  if (!(input instanceof HTMLInputElement) || listBox === null) {
+    return;
+  }
+  const empty = document.getElementById("chat-search-empty");
+
+  const apply = (): void => {
+    const query = input.value.trim().toLowerCase();
+    const rows = listBox.querySelectorAll<HTMLElement>("[data-conversation-name]");
+    let visible = 0;
+    rows.forEach((row) => {
+      const name = row.dataset.conversationName ?? "";
+      const match = query.length === 0 || name.includes(query);
+      row.classList.toggle("hidden", !match);
+      if (match) {
+        visible += 1;
+      }
+    });
+    // Show the "no matches" hint only when a non-empty query hides every row.
+    if (empty !== null) {
+      empty.classList.toggle("hidden", visible > 0 || query.length === 0);
+    }
+  };
+
+  input.addEventListener("input", apply);
+}
+
 export function initChat(): void {
   const root = document.getElementById("chat-root");
   if (root === null) {
@@ -450,6 +482,7 @@ export function initChat(): void {
 
   wireEmojiPicker();
   wireModalsAndPanel();
+  wireConversationSearch();
 
   // Timezone (server renders UTC → show the viewer's local time), for the initial page and after any HTMX swap
   // that injects more timestamps (send appends a bubble; load-more prepends an older page).

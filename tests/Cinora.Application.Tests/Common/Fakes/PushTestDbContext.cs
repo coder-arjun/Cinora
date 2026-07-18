@@ -53,6 +53,8 @@ internal sealed class PushTestDbContext(DbContextOptions<PushTestDbContext> opti
 
     DbSet<Comment> IAppDbContext.Comments => throw Unsupported();
 
+    DbSet<MovieLike> IAppDbContext.MovieLikes => throw Unsupported();
+
     DbSet<Watchlist> IAppDbContext.Watchlists => throw Unsupported();
 
     DbSet<AIRecommendationHistory> IAppDbContext.AIRecommendationHistories => throw Unsupported();
@@ -71,6 +73,7 @@ internal sealed class PushTestDbContext(DbContextOptions<PushTestDbContext> opti
         modelBuilder.Ignore<Genre>();
         modelBuilder.Ignore<MovieGenre>();
         modelBuilder.Ignore<Comment>();
+        modelBuilder.Ignore<MovieLike>();
         modelBuilder.Ignore<Watchlist>();
         modelBuilder.Ignore<AIRecommendationHistory>();
 

@@ -59,7 +59,7 @@ public sealed class SearchTests : IAsyncLifetime
         Assert.Contains("aria-live=\"polite\"", body, StringComparison.Ordinal);
 
         // No query yet → the calm idle prompt, not results.
-        Assert.Contains("Search for a movie", body, StringComparison.Ordinal);
+        Assert.Contains("Search movies", body, StringComparison.Ordinal);
     }
 
     // S2 — the FIRST real validator is wired into the pipeline: a blank query fails BEFORE the handler runs.
@@ -122,6 +122,47 @@ public sealed class SearchTests : IAsyncLifetime
         Assert.Contains("dune", body, StringComparison.Ordinal);
     }
 
+    // S3b — unified search (search/multi) surfaces BOTH movies AND series in one result set, each card linking
+    // to its OWN media route. Guards the "series in search" feature (the reported "Shameless" gap): a series
+    // result must render /discover/title/series/{id}, not the movie route.
+    [Fact]
+    public async Task Search_returns_series_titles_with_the_series_route()
+    {
+        var fake = new FakeTmdbClient
+        {
+            SearchTotalPages = 1,
+            SearchTotalResults = 2,
+        };
+        fake.SearchPages[1] =
+        [
+            Summary(701, "A Movie Title", "/m.jpg", vote: 8.0, year: 2021),
+            new TmdbTitleSummary
+            {
+                TmdbId = 34307,
+                MediaType = MediaType.Series,
+                Title = "Shameless",
+                PosterPath = "/shameless.jpg",
+                VoteAverage = 8.2,
+                ReleaseDate = new DateOnly(2011, 1, 9),
+            },
+        ];
+        using var factory = CreateFactoryWith(fake);
+        using var viewer = await AuthedAsync(factory);
+        var client = viewer.Client;
+
+        using var response = await client.GetAsync("/discover/search/results?q=shameless&media=Movie");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+
+        // The series result renders with the SERIES details route — proving unified search + per-item media type.
+        Assert.Contains("Shameless", body, StringComparison.Ordinal);
+        Assert.Contains("/discover/title/series/34307", body, StringComparison.Ordinal);
+        // The movie result on the same mixed-media page still links to the movie route.
+        Assert.Contains("A Movie Title", body, StringComparison.Ordinal);
+        Assert.Contains("/discover/title/movie/701", body, StringComparison.Ordinal);
+    }
+
     // S4 — a too-short query is the idle state, not an error: 200 prompt (guarded BEFORE dispatch), never 400.
     [Fact]
     public async Task Too_short_query_returns_200_prompt_not_400()
@@ -134,7 +175,7 @@ public sealed class SearchTests : IAsyncLifetime
         // 200 so HTMX swaps it (a non-2xx would leave the region spinning — the 2.3 lesson).
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("Search for a movie", body, StringComparison.Ordinal);
+        Assert.Contains("Search movies", body, StringComparison.Ordinal);
     }
 
     // S5 — the self-replacing sentinel advances page and stops cleanly at the last page (terminal, no re-arm).
